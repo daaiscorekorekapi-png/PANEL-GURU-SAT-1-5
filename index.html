@@ -330,9 +330,180 @@ function loadKartuUjian(){var kelas=document.getElementById('kuK').value||active
 function doCetakKartuUjian(){var pages=document.querySelectorAll('#kuBox .kartu-page');if(!pages.length){showToast('Tampilkan kartu dulu','warning');return}var content='';pages.forEach(function(p){content+=p.outerHTML});printFrame(content)}
 
 /* === LEMBAR JAWABAN === */
-function rLembarJawaban(c){var h='<div class="fade-in no-print space-y-4"><div class="card"><h3 class="font-bold text-light mb-4">Cetak Lembar Jawaban &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3><div class="grid md:grid-cols-4 gap-4 mb-4"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="ljM" class="input-field"><option value="">-- Pilih --</option>';MAPEL_LIST.forEach(function(m){h+='<option value="'+m.id+'">'+m.nama+'</option>'});h+='</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="ljK" class="input-field" onchange="switchDB(this.value)"><option value="">Semua</option>';getGuruKelas().forEach(function(k){h+='<option value="'+k+'"'+(k===activeClass?' selected':'')+'>'+k+'</option>'});h+='</select></div><div><label class="text-xs text-muted block mb-1">Rombel</label><select id="ljR" class="input-field"><option value="">Semua</option>';getGuruRombel().forEach(function(r){h+='<option value="'+r+'">Rombel '+r+'</option>'});h+='</select></div><div class="flex items-end gap-2"><button onclick="loadLembarJawaban()" class="btn-primary text-sm flex-1"><i class="fas fa-file-invoice mr-2"></i>Generate</button><button onclick="doCetakLembarJawaban()" class="btn-secondary text-sm"><i class="fas fa-print mr-2"></i>Cetak</button></div></div><div class="p-3 rounded-lg bg-warning/10 border border-warning/30 text-xs text-warning"><i class="fas fa-exclamation-triangle mr-1"></i>Opsi otomatis menyesuaikan (A-C untuk Kelas 1/2, A-D untuk lainnya).</div></div><div id="ljBox"></div></div>';c.innerHTML=h}
-function loadLembarJawaban(){var mapel=document.getElementById('ljM').value,kelas=document.getElementById('ljK').value||activeClass,rombel=document.getElementById('ljR').value;if(!mapel){showToast('Pilih Mapel','warning');return}var box=document.getElementById('ljBox');box.innerHTML='<p class="text-muted text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i></p>';Promise.all([fetchSoal(mapel,kelas),fetchSiswaRombel(kelas,rombel)]).then(function(results){var docs=results[0],siswa=results[1];if(!siswa.length){box.innerHTML='<div class="card text-center py-8"><p class="text-muted">Tidak ada siswa.</p></div>';return}if(!docs.length){box.innerHTML='<div class="card text-center py-8"><p class="text-muted">Tidak ada soal.</p></div>';return}var pg=[],ur=[];docs.forEach(function(q){if(q.type==='pg')pg.push(q);else ur.push(q)});var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;var h='<div class="print-preview-wrap">';siswa.forEach(function(s){var isLowGrade=(s.kelas==='Kelas 1'||s.kelas==='Kelas 2'||s.kelas==='Kelas 3');var optionList=(s.kelas==='Kelas 1'||s.kelas==='Kelas 2')?['A','B','C']:['A','B','C','D'];var optHtml=optionList.map(function(o){return'<div class="lembar-opt">'+o+'</div>'}).join('');var gridStyle='grid-template-columns: repeat('+optionList.length+', 1fr);';var namaVal=isLowGrade?'&nbsp;':s.nama,nisnVal=isLowGrade?'&nbsp;':s.nisn;h+='<div class="lembar-jawaban"><div class="lembar-header"><h2>Lembar Jawaban Ujian</h2><p style="text-align:center;font-weight:bold">SAT 2026 - '+mn+'</p></div><div class="lembar-bio"><label>Nama</label><span>: '+namaVal+'</span><label>NISN</label><span>: '+nisnVal+'</span><label>Kelas</label><span>: '+s.kelas+'</span><label>Rombel</label><span>: '+s.rombel+'</span></div>';if(pg.length){h+='<div class="lembar-section-title">I. Pilihan Ganda</div><div class="lembar-grid">';pg.forEach(function(q,i){h+='<div class="lembar-box"><div class="font-bold mb-1">'+(i+1)+'.</div><div class="lembar-box-inner" style="'+gridStyle+'">'+optHtml+'</div></div>'});h+='</div>'}if(ur.length){h+='<div style="page-break-before:always"></div><div class="lembar-section-title">II. Uraian</div>';ur.forEach(function(q,i){h+='<div style="margin-bottom:15px"><div class="font-bold">'+(pg.length+i+1)+'. '+q.text+'</div><div style="border:1px solid #000;height:120px;margin-top:5px;padding:5px"></div></div>'})}h+='</div>'});h+='</div>';box.innerHTML=h}).catch(function(e){box.innerHTML='<p class="text-danger p-4">'+e.message+'</p>'})}
-function doCetakLembarJawaban(){var wrap=document.getElementById('ljBox');if(!wrap){showToast('Generate lembar dulu','warning');return}printFrame(wrap.innerHTML)}
+function rLembarJawaban(c){
+  var h = `
+  <div class="fade-in no-print space-y-4">
+    <div class="card">
+      <h3 class="font-bold text-light mb-4">Cetak Lembar Jawaban &mdash; <span class="text-kopAccent">${activeClass}</span></h3>
+      <div class="grid md:grid-cols-4 gap-4 mb-4">
+        <div>
+          <label class="text-xs text-muted block mb-1">Mapel</label>
+          <select id="ljM" class="input-field">
+            <option value="">-- Pilih --</option>
+            ${MAPEL_LIST.map(m => `<option value="${m.id}">${m.nama}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-muted block mb-1">Kelas</label>
+          <select id="ljK" class="input-field" onchange="switchDB(this.value)">
+            <option value="">Semua</option>
+            ${getGuruKelas().map(k => `<option value="${k}" ${k===activeClass?'selected':''}>${k}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-muted block mb-1">Rombel</label>
+          <select id="ljR" class="input-field">
+            <option value="">Semua</option>
+            ${getGuruRombel().map(r => `<option value="${r}">Rombel ${r}</option>`).join('')}
+          </select>
+        </div>
+        <div class="flex items-end gap-2">
+          <button onclick="loadLembarJawaban()" class="btn-primary text-sm flex-1"><i class="fas fa-file-invoice mr-2"></i>Generate</button>
+          <button onclick="doCetakLembarJawaban()" class="btn-secondary text-sm"><i class="fas fa-print mr-2"></i>Cetak</button>
+        </div>
+      </div>
+      <div class="p-3 rounded-lg bg-warning/10 border border-warning/30 text-xs text-warning">
+        <i class="fas fa-exclamation-triangle mr-1"></i>Opsi otomatis menyesuaikan (A-C untuk Kelas 1/2, A-D untuk lainnya).
+      </div>
+    </div>
+    <div id="ljBox"></div>
+  </div>`;
+  c.innerHTML = h;
+}
+
+function loadLembarJawaban(){
+  var mapel=document.getElementById('ljM').value,
+      kelas=document.getElementById('ljK').value||activeClass,
+      rombel=document.getElementById('ljR').value;
+  if(!mapel){showToast('Pilih Mapel','warning');return}
+  var box=document.getElementById('ljBox');
+  box.innerHTML='<p class="text-muted text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i></p>';
+  
+  Promise.all([fetchSoal(mapel,kelas),fetchSiswaRombel(kelas,rombel)]).then(function(results){
+    var docs=results[0],siswa=results[1];
+    if(!siswa.length){box.innerHTML='<div class="card text-center py-8"><p class="text-muted">Tidak ada siswa.</p></div>';return}
+    if(!docs.length){box.innerHTML='<div class="card text-center py-8"><p class="text-muted">Tidak ada soal.</p></div>';return}
+    
+    var pg=[],ur=[];
+    docs.forEach(function(q){if(q.type==='pg')pg.push(q);else ur.push(q)});
+    var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
+    var h='<div class="print-preview-wrap">';
+    
+    siswa.forEach(function(s){
+      var isLowGrade=(s.kelas==='Kelas 1'||s.kelas==='Kelas 2'||s.kelas==='Kelas 3');
+      var optionList=(s.kelas==='Kelas 1'||s.kelas==='Kelas 2')?['A','B','C']:['A','B','C','D'];
+      var optHtml=optionList.map(function(o){return'<div class="lembar-opt">'+o+'</div>'}).join('');
+      var gridStyle='grid-template-columns: repeat('+optionList.length+', 1fr);';
+      
+      // DIPERBAHARUI: Kosongkan Nama & NISN untuk Kelas 1, 2, dan 3
+      var namaVal=isLowGrade?'':s.nama;
+      var nisnVal=isLowGrade?'':s.nisn;
+      
+      h+='<div class="lembar-jawaban">';
+      h+='<div class="lembar-header"><h2>Lembar Jawaban Ujian</h2><p style="text-align:center;font-weight:bold">SAT 2026 - '+mn+'</p></div>';
+      h+='<div class="lembar-bio"><label>Nama</label><span>: '+namaVal+'</span><label>NISN</label><span>: '+nisnVal+'</span><label>Kelas</label><span>: '+s.kelas+'</span><label>Rombel</label><span>: '+s.rombel+'</span></div>';
+      
+      if(pg.length){
+        h+='<div class="lembar-section-title">I. Pilihan Ganda</div><div class="lembar-grid">';
+        pg.forEach(function(q,i){
+          h+='<div class="lembar-box"><div class="font-bold mb-1">'+(i+1)+'.</div><div class="lembar-box-inner" style="'+gridStyle+'">'+optHtml+'</div></div>';
+        });
+        h+='</div>';
+      }
+      
+      if(ur.length){
+        h+='<div class="lembar-section-title">II. Uraian</div>';
+        h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 15px">';
+        ur.forEach(function(q,i){
+          h+='<div style="margin-bottom:5px"><div class="font-bold">'+(pg.length+i+1)+'.</div><div style="border:1px solid #000;height:80px;margin-top:3px;padding:3px"></div></div>';
+        });
+        h+='</div>';
+      }
+      
+      h+='</div>';
+    });
+    
+    h+='</div>';
+    box.innerHTML=h;
+  }).catch(function(e){
+    box.innerHTML='<p class="text-danger p-4">'+e.message+'</p>';
+  });
+}
+
+function doCetakLembarJawaban(){
+  var mapel=document.getElementById('ljM').value,
+      kelas=document.getElementById('ljK').value||activeClass,
+      rombel=document.getElementById('ljR').value;
+  if(!mapel){showToast('Pilih Mapel terlebih dahulu','warning');return}
+  
+  showToast('Menyiapkan dokumen cetak...','warning');
+  
+  Promise.all([fetchSoal(mapel,kelas),fetchSiswaRombel(kelas,rombel)]).then(function(results){
+    var docs=results[0],siswa=results[1];
+    if(!siswa.length||!docs.length){showToast('Data siswa atau soal kosong','error');return}
+    
+    var pg=[],ur=[];
+    docs.forEach(function(q){if(q.type==='pg')pg.push(q);else ur.push(q)});
+    var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
+    
+    var bodyHtml='';
+    siswa.forEach(function(s){
+      var isLowGrade=(s.kelas==='Kelas 1'||s.kelas==='Kelas 2'||s.kelas==='Kelas 3');
+      var optionList=(s.kelas==='Kelas 1'||s.kelas==='Kelas 2')?['A','B','C']:['A','B','C','D'];
+      var optHtml=optionList.map(function(o){return'<div class="lembar-opt">'+o+'</div>'}).join('');
+      var gridStyle='grid-template-columns: repeat('+optionList.length+', 1fr);';
+      
+      // DIPERBAHARUI: Kosongkan Nama & NISN untuk Kelas 1, 2, dan 3
+      var namaVal=isLowGrade?'':s.nama;
+      var nisnVal=isLowGrade?'':s.nisn;
+      
+      bodyHtml+='<div class="lembar-jawaban">';
+      bodyHtml+='<div class="lembar-header"><h2>Lembar Jawaban Ujian</h2><p style="text-align:center;font-weight:bold">SAT 2026 - '+mn+'</p></div>';
+      bodyHtml+='<div class="lembar-bio"><label>Nama</label><span>: '+namaVal+'</span><label>NISN</label><span>: '+nisnVal+'</span><label>Kelas</label><span>: '+s.kelas+'</span><label>Rombel</label><span>: '+s.rombel+'</span></div>';
+      
+      if(pg.length){
+        bodyHtml+='<div class="lembar-section-title">I. Pilihan Ganda</div><div class="lembar-grid">';
+        pg.forEach(function(q,i){
+          bodyHtml+='<div class="lembar-box"><div class="font-bold mb-1">'+(i+1)+'.</div><div class="lembar-box-inner" style="'+gridStyle+'">'+optHtml+'</div></div>';
+        });
+        bodyHtml+='</div>';
+      }
+      
+      if(ur.length){
+        bodyHtml+='<div class="lembar-section-title">II. Uraian</div>';
+        bodyHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 15px">';
+        ur.forEach(function(q,i){
+          bodyHtml+='<div style="margin-bottom:5px"><div class="font-bold">'+(pg.length+i+1)+'.</div><div style="border:1px solid #000;height:80px;margin-top:3px;padding:3px"></div></div>';
+        });
+        bodyHtml+='</div>';
+      }
+      
+      bodyHtml+='</div>';
+    });
+
+    var fullHtml='<!DOCTYPE html><html><head><title>Cetak Lembar Jawaban</title><style>'+
+      '@page{size:A4 portrait;margin:1.5cm}'+
+      'body{margin:0;padding:0;font-family:"Times New Roman",serif;font-size:11pt;line-height:1.5;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
+      '.lembar-jawaban{width:100%;min-height:290mm;background:white;color:black;font-family:"Times New Roman",serif;font-size:11pt;padding:0;margin:0 auto;page-break-after:always;position:relative;box-sizing:border-box}'+
+      '.lembar-jawaban:last-child{page-break-after:auto}'+
+      '.lembar-header{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}'+
+      '.lembar-header h2{text-align:center;text-transform:uppercase;font-size:14pt;margin:0 0 10px}'+
+      '.lembar-bio{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:5px 20px;font-size:11pt}'+
+      '.lembar-bio label{font-weight:bold}'+
+      '.lembar-bio span{border-bottom:1px dotted #000;display:inline-block;width:100%}'+
+      '.lembar-section-title{background:#eee!important;font-weight:bold;padding:5px 10px;margin:20px 0 10px;border-left:5px solid #000;text-transform:uppercase;font-size:12pt}'+
+      '.lembar-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}'+
+      '.lembar-box{border:1px solid #000;padding:4px;text-align:center;font-size:10pt}'+
+      '.lembar-box-inner{display:grid;gap:2px}'+
+      '.lembar-opt{border:1px solid #ccc;height:20px;line-height:20px;font-size:10pt}'+
+      '</style></head><body>'+bodyHtml+'</body></html>';
+    
+    printCustomFrame(fullHtml);
+    
+  }).catch(function(e){
+    showToast('Gagal mencetak: '+e.message,'error');
+  });
+}
 
 </script>
 </body>
