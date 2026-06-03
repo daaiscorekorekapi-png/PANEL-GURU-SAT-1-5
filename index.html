@@ -851,7 +851,7 @@ function hSUR(i,bobot){var v=parseInt(document.getElementById('skorUr'+i).value)
 function uAkhir(){var pg=0, ur=0;var pEl=document.getElementById('totalPG');var uEl=document.getElementById('totalUr');if(pEl)pg=parseInt(pEl.textContent)||0;if(uEl)ur=parseInt(uEl.textContent)||0;var t=Math.min(pg+ur,100);var aEl=document.getElementById('totalAkhir');if(aEl)aEl.textContent=t}
 function resetSkor(){for(var i=0;i<100;i++){var el=document.getElementById('jawabPG'+i);if(el)el.value='';var sEl=document.getElementById('skorPG'+i);if(sEl){sEl.textContent='0';sEl.className='font-bold text-muted'}var uEl=document.getElementById('skorUr'+i);if(uEl)uEl.value='0'}var tEl=document.getElementById('totalUr');if(tEl)tEl.textContent='0';uTPG();uAkhir();showToast('Skor direset')}
 
-/* ==================== KOREKSI NILAI (REVISI: KOREKSI PER SOAL & JAWABAN + HAPUS + WARNA JAWABAN) ==================== */
+/* ==================== KOREKSI NILAI (REVISI: PG 100, URAIAN 100, TOTAL / 2) ==================== */
 
 function rKoreksi(c) {
   var h = '<div class="fade-in no-print space-y-4">';
@@ -884,10 +884,9 @@ function rKoreksi(c) {
 
   // Info & Container
   h += '<div id="koreksi_info" class="hidden p-3 rounded-lg bg-info/10 border border-info/30 text-xs text-info mb-4"></div>';
-  h += '<div id="koreksi_container"></div>'; // Tempat daftar siswa
+  h += '<div id="koreksi_container"></div>';
   h += '</div></div>'; // End Card
   
-  // Container Mode Koreksi (Hidden awalnya, muncul saat tombol Koreksi ditekan)
   h += '<div id="koreksi_mode_container" class="hidden fade-in"></div>';
   
   // Modal Konfirmasi Hapus
@@ -901,8 +900,7 @@ function rKoreksi(c) {
   h += '<div class="flex gap-3">';
   h += '<button onclick="tutupModalHapus()" class="flex-1 btn-secondary text-sm">Batal</button>';
   h += '<button id="btn_konfirmasi_hapus" class="flex-1 bg-danger hover:bg-danger/80 text-white font-bold py-2 px-4 rounded-lg text-sm transition shadow-lg shadow-danger/30"><i class="fas fa-trash-alt mr-2"></i>Ya, Hapus!</button>';
-  h += '</div>';
-  h += '</div></div></div>';
+  h += '</div></div></div></div>';
   
   c.innerHTML = h;
 }
@@ -915,7 +913,6 @@ function loadKoreksiData() {
   var btnEl = document.getElementById('koreksi_btnShow');
   var modeContainer = document.getElementById('koreksi_mode_container');
 
-  // Reset tampilan ke mode daftar siswa
   modeContainer.classList.add('hidden');
   modeContainer.innerHTML = '';
   containerEl.style.display = '';
@@ -932,7 +929,6 @@ function loadKoreksiData() {
     return;
   }
 
-  // Loading
   if(btnEl){ btnEl.disabled = true; btnEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Memuat...'; }
   infoEl.classList.add('hidden');
   containerEl.innerHTML = '<div class="text-center py-8 text-muted"><i class="fas fa-circle-notch fa-spin mr-2"></i>Mengambil data nilai...</div>';
@@ -948,11 +944,12 @@ function loadKoreksiData() {
 
     var mn = (MAPEL_LIST.find(function(m) { return m.id === mapel; }) || {}).nama || mapel;
     
-    // Tampilan Tabel Ringkasan Siswa
-    var h = '<div class="card"><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">Nama Siswa</th><th class="p-2 text-center">Total</th><th class="p-2 text-center">Predikat</th><th class="p-2 text-center w-44">Aksi</th></tr></thead><tbody>';
+    var h = '<div class="card"><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">Nama Siswa</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center">Total (/2)</th><th class="p-2 text-center">Predikat</th><th class="p-2 text-center w-44">Aksi</th></tr></thead><tbody>';
 
     nilaiDocs.forEach(function(d, i) {
-      var t = d.nilaiTotal || 0;
+      var nPg = d.nilaiPG || 0;
+      var nUr = d.nilaiUr || 0;
+      var t = d.nilaiTotal || 0; // Sudah hasil bagi 2
       var pred = t >= 90 ? 'A' : t >= 80 ? 'B' : t >= 70 ? 'C' : t >= 60 ? 'D' : 'E';
       var predC = t >= 90 ? 'text-success' : t >= 70 ? 'text-info' : t >= 60 ? 'text-warning' : 'text-danger';
       var dataRombel = d.rombel || kelas; 
@@ -960,23 +957,21 @@ function loadKoreksiData() {
       h += '<tr class="border-t border-border hover:bg-dark/30">';
       h += '<td class="p-2 font-bold">' + (i + 1) + '</td>';
       h += '<td class="p-2 font-semibold">' + d.nama + ' <span class="text-xs text-muted">(' + d.nisn + ')</span></td>';
-      h += '<td class="p-2 text-center font-bold text-kopAccent">' + t + '</td>';
+      h += '<td class="p-2 text-center font-bold text-info">' + nPg + '</td>';
+      h += '<td class="p-2 text-center font-bold text-warning">' + nUr + '</td>';
+      h += '<td class="p-2 text-center font-bold text-kopAccent text-lg">' + t + '</td>';
       h += '<td class="p-2 text-center font-bold ' + predC + '">' + pred + '</td>';
       h += '<td class="p-2 text-center">';
       h += '<div class="flex items-center justify-center gap-2">';
-      // Tombol Masuk Mode Koreksi Detail
       h += '<button onclick="mulaiKoreksiDetail(\'' + d.nisn + '\',\'' + mapel + '\',\'' + kelas + '\',\'' + dataRombel + '\')" class="px-3 py-1 bg-kopAccent text-kop font-bold rounded text-xs hover:brightness-110 shadow"><i class="fas fa-edit mr-1"></i>Koreksi</button>';
-      // Tombol Hapus
       h += '<button onclick="tampilkanModalHapus(\'' + d.nisn + '\',\'' + d.nama + '\',\'' + mapel + '\',\'' + kelas + '\',\'' + dataRombel + '\')" class="px-3 py-1 bg-danger/20 text-danger font-bold rounded text-xs hover:bg-danger/30 border border-danger/30"><i class="fas fa-trash-alt mr-1"></i>Hapus</button>';
-      h += '</div>';
-      h += '</td>';
-      h += '</tr>';
+      h += '</div></td></tr>';
     });
 
     h += '</tbody></table></div></div>';
     containerEl.innerHTML = h;
     infoEl.classList.remove('hidden');
-    infoEl.innerHTML = 'Daftar Nilai: ' + mn + ' &mdash; ' + kelas + ' <span class="mx-2 text-border">|</span> <span class="text-danger"><i class="fas fa-trash-alt mr-1"></i>Klik Hapus untuk menghapus data nilai siswa</span>';
+    infoEl.innerHTML = 'Daftar Nilai: ' + mn + ' &mdash; ' + kelas + ' <span class="mx-2 text-border">|</span> <span class="text-muted"><i class="fas fa-calculator mr-1"></i>Formula: (PG + Uraian) / 2</span>';
   }).catch(function(e) {
     if(btnEl){ btnEl.disabled = false; btnEl.innerHTML = '<i class="fas fa-search mr-2"></i>Tampilkan'; }
     containerEl.innerHTML = '<p class="text-danger p-4">Gagal memuat: ' + e.message + '</p>';
@@ -991,8 +986,6 @@ function tampilkanModalHapus(nisn, nama, mapel, kelas, rombel) {
   var btnKonfirmasi = document.getElementById('btn_konfirmasi_hapus');
   
   namaEl.textContent = nama + ' (' + nisn + ')';
-  
-  // Set onclick konfirmasi
   btnKonfirmasi.onclick = function() {
     eksekusiHapusKoreksi(nisn, nama, mapel, kelas, rombel);
   };
@@ -1020,6 +1013,9 @@ function eksekusiHapusKoreksi(nisn, nama, mapel, kelas, rombel) {
   db.collection('nilai').doc(docId).delete().then(function() {
     showToast('Data nilai ' + nama + ' berhasil dihapus', 'success');
     tutupModalHapus();
+    if(!document.getElementById('koreksi_mode_container').classList.contains('hidden')){
+       kembaliKeDaftar();
+    }
     loadKoreksiData();
   }).catch(function(e) {
     showToast('Gagal menghapus: ' + e.message, 'error');
@@ -1034,7 +1030,6 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
   var container = document.getElementById('koreksi_mode_container');
   var listContainer = document.getElementById('koreksi_container');
   
-  // Sembunyikan daftar, tampilkan area koreksi
   listContainer.style.display = 'none';
   container.classList.remove('hidden');
 
@@ -1059,36 +1054,55 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     var nilai = nilaiDoc.data();
     if(!Array.isArray(soalDocs)) soalDocs = [];
 
-    // Filter soal sesuai kelas
     var filteredSoal = soalDocs.filter(function(q){ return q.kelas === kelas; });
     var pg = [], ur = [];
     filteredSoal.forEach(function(q){ if(q.type==='pg') pg.push(q); else ur.push(q); });
 
-    var bobotPG = nilai.bobotPG || (pg.length ? Math.round(100/pg.length) : 0);
-    var bobotUr = nilai.bobotUr || (ur.length ? Math.round(100/ur.length) : 0);
+    // BOBOT DIHITUNG MAX 100 PER TIPE
+    var bobotPG = pg.length ? Math.round(100/pg.length) : 0;
+    var bobotUr = ur.length ? Math.round(100/ur.length) : 0;
     
     var mn = (MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
 
     // RENDER HALAMAN KOREKSI
     var h = '<div class="card">';
-    // Header Halaman Koreksi
-    h += '<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-border gap-4">';
+    
+    // Header Info
+    h += '<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b border-border gap-4">';
     h += '<div>';
       h += '<h3 class="text-xl font-bold text-kopAccent"><i class="fas fa-check-double mr-2"></i>Lembar Koreksi Detail</h3>';
       h += '<div class="text-sm text-muted mt-1">Siswa: <b class="text-light">' + nilai.nama + '</b> (' + nilai.nisn + ') <span class="mx-2">|</span> ' + mn + ' <span class="mx-2">|</span> ' + kelas + ' ' + rombel + '</div>';
     h += '</div>';
-    h += '<div class="flex flex-wrap items-center gap-3">';
-      h += '<div class="text-right"><div class="text-xs text-muted">TOTAL SAAT INI</div><div id="liveTotal" class="text-3xl font-black text-kopAccent">' + (nilai.nilaiTotal||0) + '</div></div>';
+    h += '<div class="flex flex-wrap items-center gap-2">';
       h += '<button onclick="simpanKoreksiDetail(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="btn-primary shadow-lg"><i class="fas fa-save mr-2"></i>SIMPAN</button>';
-      h += '<button onclick="tampilkanModalHapus(\''+nisn+'\',\''+nilai.nama+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="bg-danger/20 text-danger font-bold py-2 px-4 rounded-lg text-sm hover:bg-danger/30 border border-danger/40 transition shadow-lg shadow-danger/10"><i class="fas fa-trash-alt mr-2"></i>HAPUS</button>';
+      h += '<button onclick="tampilkanModalHapus(\''+nisn+'\',\''+nilai.nama+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="bg-danger/20 text-danger font-bold py-2 px-4 rounded-lg text-sm hover:bg-danger/30 border border-danger/40 transition"><i class="fas fa-trash-alt mr-2"></i>HAPUS</button>';
       h += '<button onclick="kembaliKeDaftar()" class="btn-secondary text-muted hover:text-light"><i class="fas fa-arrow-left mr-1"></i>Kembali</button>';
+    h += '</div>';
+    h += '</div>';
+
+    // === PAPAN SKOR LIVE (PG, URAIAN, TOTAL) ===
+    h += '<div class="grid grid-cols-3 gap-4 mb-6">';
+    // Skor PG
+    h += '<div class="bg-info/10 border border-info/30 rounded-xl p-4 text-center">';
+      h += '<div class="text-xs text-info font-bold mb-1"><i class="fas fa-list-ul mr-1"></i>SKOR PG (Maks 100)</div>';
+      h += '<div id="livePg" class="text-4xl font-black text-info">0</div>';
+    h += '</div>';
+    // Skor Uraian
+    h += '<div class="bg-warning/10 border border-warning/30 rounded-xl p-4 text-center">';
+      h += '<div class="text-xs text-warning font-bold mb-1"><i class="fas fa-pen mr-1"></i>SKOR URAIAN (Maks 100)</div>';
+      h += '<div id="liveUr" class="text-4xl font-black text-warning">0</div>';
+    h += '</div>';
+    // Skor Total (Rata-rata)
+    h += '<div class="bg-kopAccent/10 border-2 border-kopAccent/40 rounded-xl p-4 text-center">';
+      h += '<div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL (PG+Uraian)/2</div>';
+      h += '<div id="liveTotal" class="text-4xl font-black text-kopAccent">0</div>';
     h += '</div>';
     h += '</div>';
 
     // TAB SOAL
     h += '<div class="flex gap-4 mb-4 border-b border-border"><button class="pb-2 border-b-2 border-info text-info font-bold text-sm">Soal Uraian</button><span class="pb-2 border-b-2 border-transparent text-muted text-sm">Pilihan Ganda (Otomatis)</span></div>';
 
-    // LIST SOAL URAIAN (Yang bisa diedit jawabannya & nilainya)
+    // LIST SOAL URAIAN
     h += '<div class="space-y-6 mb-8">';
     
     ur.forEach(function(q, i){
@@ -1098,23 +1112,20 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
       var kunciUr = q.answer || '(Pedoman)';
 
       h += '<div class="bg-dark/40 p-4 rounded-lg border border-warning/20">';
-      h += '<div class="flex justify-between items-start mb-2">';
+      h += '<div class="flex justify-between items-center mb-2">';
         h += '<span class="bg-warning/20 text-warning px-2 py-0.5 rounded text-xs font-bold">Soal No. ' + (pg.length + i + 1) + '</span>';
         h += '<div class="flex items-center gap-2">';
           h += '<span class="text-xs text-muted">Maks: ' + bobotUr + '</span>';
-          h += '<input type="number" class="score-input" id="inputUr_'+idxUr+'" value="'+skorUr+'" min="0" max="'+bobotUr+'" oninput="hitungLiveTotal()">';
+          h += '<input type="number" id="inputUr_'+idxUr+'" value="'+skorUr+'" min="0" max="'+bobotUr+'" oninput="hitungLiveTotal()" style="width: 70px; text-align: center; background-color: #1a1a1a; color: #facc15; border: 2px solid #facc15; border-radius: 8px; padding: 6px; font-size: 18px; font-weight: 900; outline: none;">';
         h += '</div>';
       h += '</div>';
       
       h += '<p class="text-sm text-light mb-3 font-medium">' + q.text + '</p>';
       
       h += '<div class="grid md:grid-cols-2 gap-4">';
-        // Kolom Kunci - WARNA TERANG JELAS
         h += '<div class="bg-dark/60 p-3 rounded border border-border"><div class="text-xs text-kopAccent font-bold mb-1">Kunci / Pedoman:</div><div class="text-sm text-white font-medium leading-relaxed">' + kunciUr + '</div></div>';
-        // Kolom Jawaban Siswa (EDITABLE) - WARNA KUNING TERANG DI ATAS BG GELAP
         h += '<div class="bg-amber-950/40 p-3 rounded border-2 border-amber-400/40">';
           h += '<div class="text-xs text-amber-300 font-bold mb-2"><i class="fas fa-pen-fancy mr-1"></i>Jawaban Siswa <span class="font-normal text-amber-400/70 text-[10px]">(Edit jika perlu)</span>:</div>';
-          // Textarea dengan warna teks KUNING TERANG agar sangat jelas
           h += '<textarea id="textUr_'+idxUr+'" class="w-full bg-dark/80 text-amber-100 text-sm font-medium leading-relaxed rounded-lg p-3 border border-amber-500/30 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 outline-none resize-y min-h-[100px]" oninput="updateDraftJawabanUr('+idxUr+')">' + jawabanUr + '</textarea>';
         h += '</div>';
       h += '</div>';
@@ -1124,7 +1135,7 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     if(!ur.length) h += '<div class="text-center text-muted py-8"><i class="fas fa-file-alt text-3xl mb-2"></i><p>Tidak ada soal uraian.</p></div>';
     h += '</div>';
 
-    // LIST SOAL PG (Hanya Read-Only/Edit Kunci, Skor Auto)
+    // LIST SOAL PG
     if(pg.length){
       h += '<h4 class="font-bold text-info text-sm mb-4 border-b border-info/30 pb-2"><i class="fas fa-list-ol mr-2"></i>Cek Jawaban Pilihan Ganda</h4>';
       h += '<div class="grid md:grid-cols-2 gap-4">';
@@ -1137,7 +1148,6 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
         h += '<div class="bg-dark/40 p-3 rounded border '+(benar?'border-success/30':'border-danger/30')+'">';
         h += '<div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-muted">No. '+(i+1)+'</span><span class="text-xs font-bold '+(benar?'text-success':'text-danger')+'">Skor: '+skor+'</span></div>';
         h += '<p class="text-xs text-light mb-2 line-clamp-2">' + q.text + '</p>';
-        // Dropdown untuk membetulkan jawaban siswa jika salah input sistem
         h += '<div class="flex gap-2 items-center bg-dark/60 p-1.5 rounded">';
         h += '<span class="text-[10px] text-muted">Jawab:</span>';
         h += '<select id="selPG_'+i+'" class="input-field text-xs py-0.5" data-kunci="'+kunci+'" data-bobot="'+bobotPG+'" onchange="hitungLiveTotal()">';
@@ -1146,20 +1156,15 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
         h += '</select>';
         h += '<span class="text-[10px] text-muted mx-1">Kunci:</span>';
         h += '<span class="text-xs font-bold text-success">'+kunci+'</span>';
-        h += '</div>';
-        h += '</div>';
+        h += '</div></div>';
       });
       h += '</div>';
     }
 
     h += '</div>'; // End Card
-    
-    // Footer Warning
     h += '<div class="mt-3 p-3 rounded-lg bg-danger/5 border border-danger/20 text-xs text-danger/80"><i class="fas fa-info-circle mr-1"></i>Perubahan belum tersimpan hingga Anda menekan tombol <b>SIMPAN</b>. Mengklik <b>HAPUS</b> akan menghapus seluruh data nilai siswa ini secara permanen.</div>';
     
     container.innerHTML = h;
-    
-    // Hitung total awal
     hitungLiveTotal();
 
   }).catch(function(e){
@@ -1174,43 +1179,51 @@ function kembaliKeDaftar() {
   document.getElementById('koreksi_container').style.display = '';
 }
 
-function updateDraftJawabanUr(idx) {
-  // Fungsi ini untuk menandai bahwa ada perubahan (opsional)
-}
+function updateDraftJawabanUr(idx) {}
 
+// ==================== HITUNG TOTAL LIVE (DIBAGI 2) ====================
 function hitungLiveTotal() {
-  var currentTotal = 0;
+  var skorPG = 0;
+  var skorUr = 0;
   
-  // 1. Hitung Uraian
+  // 1. Hitung Uraian (Maks 100)
   var elsUr = document.querySelectorAll('[id^="inputUr_"]');
-  elsUr.forEach(function(el){ currentTotal += parseInt(el.value)||0; });
+  elsUr.forEach(function(el){ skorUr += parseInt(el.value)||0; });
   
-  // 2. Hitung PG (Cek select dengan data-kunci dan data-bobot)
+  // 2. Hitung PG (Maks 100)
   var elsPG = document.querySelectorAll('[id^="selPG_"]');
   elsPG.forEach(function(el){
      var kunci = el.getAttribute('data-kunci');
      var bobot = parseInt(el.getAttribute('data-bobot'));
      if(kunci && bobot){
-        if(el.value === kunci) currentTotal += bobot;
+        if(el.value === kunci) skorPG += bobot;
      }
   });
   
+  // 3. Hitung Total (Rata-rata)
+  var finalTotal = Math.round((skorPG + skorUr) / 2);
+  
   // Update UI
   var tEl = document.getElementById('liveTotal');
+  var pgEl = document.getElementById('livePg');
+  var urEl = document.getElementById('liveUr');
+  
+  if(pgEl) pgEl.textContent = skorPG;
+  if(urEl) urEl.textContent = skorUr;
+  
   if(tEl) {
-    tEl.textContent = currentTotal;
-    // Efek visual saat berubah
-    tEl.classList.add('scale-110');
-    setTimeout(function(){ tEl.classList.remove('scale-110'); }, 200);
+    tEl.textContent = finalTotal;
+    tEl.style.transform = 'scale(1.1)';
+    setTimeout(function(){ tEl.style.transform = 'scale(1)'; }, 200);
   }
 }
 
+// ==================== SIMPAN KOREKSI (DIBAGI 2) ====================
 function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
   var db = getDB(kelas);
   if(!db){ showToast('DB Error','error'); return; }
   var docId = kelas + '_' + rombel + '_' + mapel + '_' + nisn;
   
-  // Collect Data
   var jawabanPG = [];
   var jawabanUr = [];
   var skorPerSoalUr = [];
@@ -1239,8 +1252,8 @@ function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
      skorUrTotal += s;
   }
   
-  var finalTotal = skorPGTotal + skorUrTotal;
-  if(finalTotal > 100) finalTotal = 100;
+  // RUMUS BARU: Total = (PG + Uraian) / 2
+  var finalTotal = Math.round((skorPGTotal + skorUrTotal) / 2);
   
   var btn = document.querySelector('#koreksi_mode_container .btn-primary');
   var ori = btn.innerHTML;
@@ -1251,15 +1264,15 @@ function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
     jawabanPG: jawabanPG,
     jawabanUr: jawabanUr,
     skorPerSoalUr: skorPerSoalUr,
-    nilaiPG: skorPGTotal,
-    nilaiUr: skorUrTotal,
-    nilaiTotal: finalTotal,
+    nilaiPG: skorPGTotal,      // Disimpan utuh (Maks 100)
+    nilaiUr: skorUrTotal,      // Disimpan utuh (Maks 100)
+    nilaiTotal: finalTotal,    // Sudah hasil bagi 2
     submittedBy: 'guru_koreksi_detail',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
   
   db.collection('nilai').doc(docId).update(updateData).then(function(){
-    showToast('Koreksi berhasil disimpan! Total: ' + finalTotal, 'success');
+    showToast('Koreksi berhasil disimpan! (PG:'+skorPGTotal+' + Ur:'+skorUrTotal+')/2 = '+finalTotal, 'success');
     btn.disabled = false;
     btn.innerHTML = ori;
     kembaliKeDaftar();
