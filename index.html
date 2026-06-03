@@ -303,7 +303,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0f1923;color:#e8ecf1;min
     <div class="nav-item" data-page="print-kisi"><i class="fas fa-th-list w-5 text-center"></i>Kisi-Kisi</div>
     <div class="nav-item" data-page="print-kunci"><i class="fas fa-key w-5 text-center"></i>Kunci Jawaban</div>
     <div class="nav-item" data-page="pensekoran"><i class="fas fa-calculator w-5 text-center"></i>Pensekoran</div>
-    <div class="nav-item" data-page=""><i class="fas fa-check-double w-5 text-center"></i>Koreksi Nilai</div>
+    <div class="nav-item" data-page="koreksi"><i class="fas fa-check-double w-5 text-center"></i>Koreksi Nilai</div>
     <div class="nav-item" data-page="cetak-nilai"><i class="fas fa-file-alt w-5 text-center"></i>Cetak Nilai</div>
     <div class="nav-item" data-page="data-siswa"><i class="fas fa-users w-5 text-center"></i>Data Siswa</div>
     <div class="nav-item" data-page="token"><i class="fas fa-ticket-alt w-5 text-center"></i>Token Ujian</div>
@@ -407,20 +407,17 @@ function fetchSoal(mapel,kelas){
   });
 }
 
-// DIPERBAIKI: Filter client-side untuk menghindari error Index Firestore
 function fetchSiswaRombel(kelas,rombel){
   var targetKelas=kelas||activeClass;
   var db=getDB(targetKelas);
   if(!db) return Promise.resolve([]);
   
   var npsnGuru=getGuruNPSN();
-  // Hanya filter NPSN di server (asumsi NPSN sudah di-index)
   var q = db.collection('siswa').where('npsn','==',npsnGuru);
   
   return q.get().then(function(s){
     var d=[];
     s.forEach(function(doc){var t=doc.data(); t._id=doc.id; d.push(t)});
-    // Filter rombel di client (javascript) untuk mencegah error composite index
     if(rombel) d = d.filter(function(x){return x.rombel === rombel});
     return d.sort(function(a,b){return(a.nama||'').localeCompare(b.nama||'')});
   }).catch(function(err){
@@ -447,7 +444,6 @@ function fetchNilai(mapel,kelas,rombel){
   var targetKelas=kelas||activeClass; var db=getDB(targetKelas);
   if(!db) return Promise.resolve([]);
   var npsnGuru=getGuruNPSN(), q=db.collection('nilai').where('mapel','==',mapel);
-  // Filter rombel via client-side untuk mencegah error index jika rombel & mapel composite index belum dibuat
   return q.get().then(function(s){
     var d=[]; s.forEach(function(doc){var t=doc.data(); t._id=doc.id; d.push(t)});
     return d.filter(function(x){return(!rombel||x.rombel===rombel)&&(!x.npsn||x.npsn===npsnGuru)}).sort(function(a,b){return(a.nama||'').localeCompare(b.nama||'')});
@@ -460,7 +456,6 @@ function fetchNilai(mapel,kelas,rombel){
 function cekNISN(nisn,kelas,rombel){
   var targetKelas=kelas||activeClass; var db=getDB(targetKelas);
   if(!db) return Promise.resolve(null);
-  // Cari by NISN saja (sebaiknya ada index single field di Firestore)
   return db.collection('siswa').where('nisn','==',nisn).limit(1).get().then(function(s){return s}).catch(function(e){return null});
 }
 
@@ -860,67 +855,101 @@ function resetSkor(){for(var i=0;i<100;i++){var el=document.getElementById('jawa
 
 function rKoreksi(c) {
   try {
-    // Cek variabel global, berikan default jika belum ada (untuk mencegah error saat awal load)
-    var currentClass = (typeof activeClass !== 'undefined') ? activeClass : 'X-1'; 
-    var guruRombel = (typeof getGuruRombel === 'function') ? getGuruRombel() : 'Guru Pengampu';
+    // Gunakan ID unik dengan prefix 'koreksi_' untuk mencegah konflik
+    var uniquePrefix = 'koreksi_';
     
-    // Cek ketersediaan MAPEL_LIST, jika tidak ada gunakan array kosong
-    var mapelList = (typeof MAPEL_LIST !== 'undefined' && Array.isArray(MAPEL_LIST)) ? MAPEL_LIST : [];
+    var h = '<div class="fade-in no-print space-y-4"><div class="card"><h3 class="font-bold text-light mb-4">Koreksi Nilai &mdash; <span class="text-kopAccent">' + activeClass + '</span></h3>';
     
-    // Cek fungsi getGuruKelas
-    var listKelas = (typeof getGuruKelas === 'function') ? getGuruKelas() : ['X-1', 'X-2', 'XI-1'];
-
-    var h = '<div class="fade-in no-print space-y-4"><div class="card"><h3 class="font-bold text-light mb-4">Koreksi Nilai &mdash; <span class="text-kopAccent">' + currentClass + ' ' + guruRombel + '</span></h3><div class="grid md:grid-cols-3 gap-4 mb-4"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="korM" class="input-field" onchange="loadKorList()"><option value="">-- Pilih --</option>';
+    // Filter Bar
+    h += '<div class="grid md:grid-cols-3 gap-4 mb-4">';
     
-    if (mapelList.length > 0) {
-      mapelList.forEach(function(m) {
+    // Dropdown Mapel
+    h += '<div><label class="text-xs text-muted block mb-1">Mapel</label>';
+    h += '<select id="' + uniquePrefix + 'mapel" class="input-field" onchange="loadKoreksiData()">';
+    h += '<option value="">-- Pilih Mapel --</option>';
+    if (typeof MAPEL_LIST !== 'undefined' && Array.isArray(MAPEL_LIST)) {
+      MAPEL_LIST.forEach(function(m) {
         h += '<option value="' + m.id + '">' + m.nama + '</option>';
       });
-    } else {
-      h += '<option disabled>Mapel tidak ditemukan</option>';
     }
+    h += '</select></div>';
     
-    h += '</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="korK" class="input-field" onchange="loadKorList()"><option value="">Semua</option>';
-    
-    if (listKelas.length > 0) {
-      listKelas.forEach(function(k) {
-        h += '<option value="' + k + '"' + (k === currentClass ? ' selected' : '') + '>' + k + '</option>';
+    // Dropdown Kelas
+    h += '<div><label class="text-xs text-muted block mb-1">Kelas</label>';
+    h += '<select id="' + uniquePrefix + 'kelas" class="input-field" onchange="switchDB(this.value); loadKoreksiData()">';
+    h += '<option value="">Semua</option>';
+    if (typeof getGuruKelas === 'function') {
+      getGuruKelas().forEach(function(k) {
+        h += '<option value="' + k + '"' + (k === activeClass ? ' selected' : '') + '>' + k + '</option>';
       });
     }
+    h += '</select></div>';
+
+    // Tombol Aksi
+    h += '<div class="flex items-end gap-2"><button id="' + uniquePrefix + 'btnShow" onclick="loadKoreksiData()" class="btn-primary text-sm flex-1"><i class="fas fa-search mr-2"></i>Tampilkan</button></div>';
+    h += '</div>'; // End Grid
+
+    // Info Area & Result Area
+    h += '<div id="' + uniquePrefix + 'info" class="hidden p-3 rounded-lg bg-info/10 border border-info/30 text-xs text-info mb-4"></div>';
+    h += '<div id="' + uniquePrefix + 'container"></div>'; // Container hasil
     
-    h += '</select></div><div class="flex items-end gap-2"><button onclick="loadKorList()" class="btn-primary text-sm flex-1"><i class="fas fa-search mr-2"></i>Tampilkan</button></div></div><div id="korInfo" class="hidden p-3 rounded-lg bg-info/10 border border-info/30 text-xs text-info mb-4"></div></div><div id="korBox"></div></div>';
+    h += '</div></div>'; // End Card
+    
     c.innerHTML = h;
+    
+    // Setelah render, kosongkan container agar bersih
+    document.getElementById(uniquePrefix + 'container').innerHTML = '';
+    
   } catch (e) {
     console.error("Error rKoreksi:", e);
     c.innerHTML = '<div class="p-4 text-danger">Gagal memuat form koreksi: ' + e.message + '</div>';
   }
 }
 
-function loadKorList() {
-  var mapel = document.getElementById('korM').value;
-  // Gunakan activeClass global, atau fallback ke nilai dropdown
-  var kelas = document.getElementById('korK').value || (typeof activeClass !== 'undefined' ? activeClass : '');
-  
+function loadKoreksiData() {
+  var uniquePrefix = 'koreksi_';
+  var mapelEl = document.getElementById(uniquePrefix + 'mapel');
+  var kelasEl = document.getElementById(uniquePrefix + 'kelas');
+  var infoEl = document.getElementById(uniquePrefix + 'info');
+  var containerEl = document.getElementById(uniquePrefix + 'container');
+  var btnEl = document.getElementById(uniquePrefix + 'btnShow');
+
+  // Cek keberadaan elemen
+  if (!mapelEl || !kelasEl || !containerEl) {
+    console.error("Elemen UI Koreksi tidak ditemukan");
+    return;
+  }
+
+  var mapel = mapelEl.value;
+  var kelas = kelasEl.value || (typeof activeClass !== 'undefined' ? activeClass : '');
+
   if (!mapel) {
     showToast('Pilih Mapel terlebih dahulu', 'warning');
-    return;
-  }
-  if (!kelas) {
-    showToast('Kelas tidak terdeteksi', 'warning');
+    infoEl.classList.add('hidden');
+    containerEl.innerHTML = '';
     return;
   }
 
-  var info = document.getElementById('korInfo');
-  var box = document.getElementById('korBox');
-  box.innerHTML = '<p class="text-muted text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>Memuat Data Nilai...</p>';
+  // UI Loading State
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Memuat...';
+  }
+  infoEl.classList.add('hidden');
+  containerEl.innerHTML = '<div class="text-center py-8 text-muted"><i class="fas fa-circle-notch fa-spin mr-2"></i>Mengambil data nilai...</div>';
 
+  // Fetch Data
   fetchNilai(mapel, kelas).then(function(nilaiDocs) {
-    // Pastikan nilaiDocs adalah array, jika tidak, ubah ke array kosong
+    // Reset tombol
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerHTML = '<i class="fas fa-search mr-2"></i>Tampilkan';
+    }
+
     if (!Array.isArray(nilaiDocs)) nilaiDocs = [];
 
     if (!nilaiDocs.length) {
-      box.innerHTML = '<div class="card text-center py-8"><i class="fas fa-clipboard-list text-4xl text-muted mb-3"></i><p class="text-muted">Belum ada data nilai untuk mapel ini.</p></div>';
-      info.classList.add('hidden');
+      containerEl.innerHTML = '<div class="card text-center py-8 border-dashed border-2 border-border bg-dark/20"><i class="fas fa-inbox text-4xl text-muted mb-3"></i><p class="text-muted">Belum ada data nilai untuk mapel ini.</p><p class="text-xs text-muted mt-2">Pastikan siswa sudah mengerjakan ujian.</p></div>';
       return;
     }
 
@@ -928,9 +957,12 @@ function loadKorList() {
     var mapelName = mn.nama || mapel;
     
     var onlineCount = nilaiDocs.filter(function(n) { return n.submittedBy === 'siswa_online'; }).length;
-    info.classList.remove('hidden');
-    info.innerHTML = '<i class="fas fa-info-circle mr-1"></i>' + mapelName + ' &mdash; ' + kelas + ' | ' + nilaiDocs.length + ' siswa <span class="text-success font-bold">(' + onlineCount + ' online)</span>';
+    
+    // Tampilkan Info
+    infoEl.classList.remove('hidden');
+    infoEl.innerHTML = '<i class="fas fa-info-circle mr-1"></i>' + mapelName + ' &mdash; ' + kelas + ' | ' + nilaiDocs.length + ' siswa <span class="text-success font-bold">(' + onlineCount + ' online)</span>';
 
+    // Render Table
     var h = '<div class="card"><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">NISN</th><th class="p-2 text-left">Nama Siswa</th><th class="p-2 text-center">Tipe</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center font-bold">Nilai Akhir</th><th class="p-2 text-center w-28">Aksi</th></tr></thead><tbody>';
 
     nilaiDocs.forEach(function(d, i) {
@@ -948,36 +980,32 @@ function loadKorList() {
       h += '<td class="p-2 text-center text-warning font-bold">' + (d.nilaiUr || 0) + '</td>';
       h += '<td class="p-2 text-center"><span class="font-black text-lg ' + predC + '">' + t + '</span> <span class="text-xs font-bold ' + predC + '">(' + pred + ')</span></td>';
       
-      // Pastikan fungsi openEditKoreksi dan delNilai ada sebelum dipanggil
-      var editAction = (typeof openEditKoreksi === 'function') ? 
-        'onclick="openEditKoreksi(\'' + d.nisn + '\',\'' + mapel + '\',\'' + kelas + '\',\'' + (d.rombel||kelas) + '\')"' : 'disabled';
-      var delAction = (typeof delNilai === 'function') ? 
-        'onclick="delNilai(\'' + d.nisn + '\',\'' + mapel + '\',\'' + kelas + '\',\'' + (d.rombel||kelas) + '\')"' : 'disabled';
-
+      // Pastikan data rombel ada untuk fungsi edit
+      var dataRombel = d.rombel || kelas; 
+      
       h += '<td class="p-2 text-center"><div class="flex gap-1 justify-center">' +
-        '<button ' + editAction + ' class="px-2 py-1 bg-info/20 text-info rounded text-xs font-bold hover:bg-info/30 border border-info/30"><i class="fas fa-edit"></i> Edit</button>' +
-        '<button ' + delAction + ' class="px-2 py-1 bg-danger/20 text-danger rounded text-xs font-bold hover:bg-danger/30 border border-danger/30"><i class="fas fa-trash"></i></button>' +
+        '<button onclick="openEditKoreksi(\'' + d.nisn + '\',\'' + mapel + '\',\'' + kelas + '\',\'' + dataRombel + '\')" class="px-2 py-1 bg-info/20 text-info rounded text-xs font-bold hover:bg-info/30 border border-info/30"><i class="fas fa-edit"></i> Edit</button>' +
+        '<button onclick="delNilai(\'' + d.nisn + '\',\'' + mapel + '\',\'' + kelas + '\',\'' + dataRombel + '\')" class="px-2 py-1 bg-danger/20 text-danger rounded text-xs font-bold hover:bg-danger/30 border border-danger/30"><i class="fas fa-trash"></i></button>' +
         '</div></td>';
       h += '</tr>';
     });
 
     h += '</tbody></table></div></div>';
-    box.innerHTML = h;
+    containerEl.innerHTML = h;
+
   }).catch(function(e) {
-    console.error("Error loadKorList:", e);
-    box.innerHTML = '<p class="text-danger p-4">Gagal memuat data: ' + e.message + '</p>';
+    console.error("Error loadKoreksiData:", e);
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.innerHTML = '<i class="fas fa-search mr-2"></i>Tampilkan';
+    }
+    containerEl.innerHTML = '<p class="text-danger p-4 text-center">Gagal memuat data nilai. <br> <small>' + e.message + '</small></p>';
   });
 }
 
 function delNilai(nisn, mapel, kelas, rombel) {
   if (!confirm('Hapus nilai siswa ini?')) return;
   
-  // Pastikan fungsi getDB ada
-  if (typeof getDB !== 'function') {
-    showToast('Fungsi Database tidak ditemukan', 'error');
-    return;
-  }
-
   var db = getDB(kelas);
   if (!db) {
     showToast('DB error: koneksi database gagal', 'error');
@@ -987,18 +1015,13 @@ function delNilai(nisn, mapel, kelas, rombel) {
   var docId = kelas + '_' + rombel + '_' + mapel + '_' + nisn;
   db.collection('nilai').doc(docId).delete().then(function() {
     showToast('Nilai siswa dihapus');
-    loadKorList();
+    loadKoreksiData(); // Reload data
   }).catch(function(e) {
     showToast('Gagal menghapus: ' + e.message, 'error');
   });
 }
 
 function openEditKoreksi(nisn, mapel, kelas, rombel) {
-  if (typeof getDB !== 'function') {
-    showToast('Fungsi Database tidak ditemukan', 'error');
-    return;
-  }
-
   var db = getDB(kelas);
   if (!db) {
     showToast('DB error', 'error');
@@ -1006,22 +1029,23 @@ function openEditKoreksi(nisn, mapel, kelas, rombel) {
   }
   var docId = kelas + '_' + rombel + '_' + mapel + '_' + nisn;
 
-  showToast('Memuat detail jawaban...', 'warning');
+  // Tampilkan loading di modal jika perlu (opsional), atau langsung ambil data
+  openModal('<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-kopAccent mb-2"></i><p>Memuat detail jawaban...</p></div>');
 
   Promise.all([
     db.collection('nilai').doc(docId).get(),
-    fetchSoal(mapel, kelas) // Pastikan fetchSoal terdefinisi dan mengembalikan Promise
+    fetchSoal(mapel, kelas)
   ]).then(function(results) {
     var nilaiDoc = results[0];
     var soalDocs = results[1];
 
     if (!nilaiDoc.exists) {
-      showToast('Data nilai tidak ditemukan', 'error');
+      closeModal();
+      showToast('Data nilai tidak ditemukan (mungkin dihapus)', 'error');
       return;
     }
     var nilai = nilaiDoc.data();
 
-    // Pastikan soalDocs adalah array
     if (!Array.isArray(soalDocs)) soalDocs = [];
 
     var filteredSoal = kelas ? soalDocs.filter(function(q) { return q.kelas === kelas; }) : soalDocs;
@@ -1045,9 +1069,10 @@ function openEditKoreksi(nisn, mapel, kelas, rombel) {
 
     h += '<div class="bg-dark/50 p-3 rounded-lg border border-border mb-4 flex justify-between items-center"><div><span class="font-bold text-light">' + nilai.nama + '</span> <span class="text-xs text-muted">(' + nilai.nisn + ')</span><br><span class="text-xs text-muted">' + mapelName + ' &bull; ' + kelas + ' ' + rombel + (nilai.submittedBy === 'siswa_online' ? ' <span class="text-success font-bold">&bull; ONLINE</span>' : '') + '</span></div><div class="text-right"><div class="text-xs text-muted">Nilai Saat Ini</div><div class="text-2xl font-black text-kopAccent">' + (nilai.nilaiTotal || 0) + '</div></div></div>';
 
+    // Bagian PG
     if (pg.length) {
       h += '<h4 class="font-bold text-info text-sm mb-2 border-b border-info/30 pb-1">I. Pilihan Ganda (' + bobotPG + ' poin/soal)</h4>';
-      h += '<div class="space-y-2 mb-6">';
+      h += '<div class="space-y-2 mb-6 max-h-[300px] overflow-y-auto pr-2 custom-scroll">';
       pg.forEach(function(q, i) {
         var kunci = kunciPG[i];
         var jawaban = jawabanPG[i] || '';
@@ -1063,9 +1088,10 @@ function openEditKoreksi(nisn, mapel, kelas, rombel) {
       h += '</div>';
     }
 
+    // Bagian Uraian
     if (ur.length) {
       h += '<h4 class="font-bold text-warning text-sm mb-2 border-b border-warning/30 pb-1">II. Uraian (Maks ' + bobotUr + ' poin/soal)</h4>';
-      h += '<div class="space-y-3 mb-6">';
+      h += '<div class="space-y-3 mb-6 max-h-[300px] overflow-y-auto pr-2 custom-scroll">';
       ur.forEach(function(q, i) {
         var kunciUr = q.answer || '(Pedoman)';
         var jawabanUrText = jawabanUr[i] || '';
@@ -1080,36 +1106,35 @@ function openEditKoreksi(nisn, mapel, kelas, rombel) {
       h += '</div>';
     }
 
+    // Input Manual Nilai
     h += '<div class="bg-kop/20 p-4 rounded-lg border border-kopAccent/30">';
     h += '<h4 class="font-bold text-kopAccent text-sm mb-3"><i class="fas fa-pen mr-1"></i> Input / Edit Nilai</h4>';
     h += '<div class="grid grid-cols-3 gap-4 mb-4">';
-    h += '<div><label class="text-xs text-muted block mb-1">Nilai PG</label><input type="number" id="editPG" class="input-field text-center font-bold" value="' + (nilai.nilaiPG || 0) + '" min="0" oninput="calcEditTotal()"></div>';
-    h += '<div><label class="text-xs text-muted block mb-1">Nilai Uraian</label><input type="number" id="editUr" class="input-field text-center font-bold" value="' + (nilai.nilaiUr || 0) + '" min="0" oninput="calcEditTotal()"></div>';
-    h += '<div><label class="text-xs text-muted block mb-1">Nilai Akhir</label><input type="number" id="editTotal" class="input-field text-center font-black text-kopAccent text-lg" value="' + (nilai.nilaiTotal || 0) + '" min="0" max="100" readonly></div>';
+    h += '<div><label class="text-xs text-muted block mb-1">Nilai PG</label><input type="number" id="editKoreksi_PG" class="input-field text-center font-bold" value="' + (nilai.nilaiPG || 0) + '" min="0" oninput="calcKoreksiTotal()"></div>';
+    h += '<div><label class="text-xs text-muted block mb-1">Nilai Uraian</label><input type="number" id="editKoreksi_Ur" class="input-field text-center font-bold" value="' + (nilai.nilaiUr || 0) + '" min="0" oninput="calcKoreksiTotal()"></div>';
+    h += '<div><label class="text-xs text-muted block mb-1">Nilai Akhir</label><input type="number" id="editKoreksi_Total" class="input-field text-center font-black text-kopAccent text-lg" value="' + (nilai.nilaiTotal || 0) + '" min="0" max="100" readonly></div>';
     h += '</div></div>';
 
-    h += '<input type="hidden" id="editNisn" value="' + nisn + '"><input type="hidden" id="editMapel" value="' + mapel + '"><input type="hidden" id="editKelas" value="' + kelas + '"><input type="hidden" id="editRombel" value="' + rombel + '">';
+    // Hidden Inputs
+    h += '<input type="hidden" id="editKoreksi_Nisn" value="' + nisn + '"><input type="hidden" id="editKoreksi_Mapel" value="' + mapel + '"><input type="hidden" id="editKoreksi_Kelas" value="' + kelas + '"><input type="hidden" id="editKoreksi_Rombel" value="' + rombel + '">';
 
+    // Action Buttons
     h += '<div class="mt-6 flex justify-end gap-3"><button onclick="closeModal()" class="btn-secondary">Batal</button><button onclick="saveEditKoreksi()" class="btn-primary"><i class="fas fa-save mr-2"></i>Simpan Perubahan</button></div>';
 
-    // Pastikan openModal ada
-    if (typeof openModal === 'function') {
-      openModal(h);
-    } else {
-      console.error("openModal function missing");
-      document.body.insertAdjacentHTML('beforeend', '<div id="tempModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;">' + h + '</div>');
-    }
+    // Render ke modal
+    document.getElementById('modalBody').innerHTML = h;
+    
   }).catch(function(e) {
     console.error("Error openEditKoreksi:", e);
+    closeModal();
     showToast('Gagal memuat detail: ' + e.message, 'error');
   });
 }
 
-// FUNGSI INI SEBELUMNYA HILANG / TIDAK DIDEFINISIKAN
-function calcEditTotal() {
-  var pgEl = document.getElementById('editPG');
-  var urEl = document.getElementById('editUr');
-  var totalEl = document.getElementById('editTotal');
+function calcKoreksiTotal() {
+  var pgEl = document.getElementById('editKoreksi_PG');
+  var urEl = document.getElementById('editKoreksi_Ur');
+  var totalEl = document.getElementById('editKoreksi_Total');
 
   if (!pgEl || !urEl || !totalEl) return;
 
@@ -1117,26 +1142,20 @@ function calcEditTotal() {
   var ur = parseInt(urEl.value) || 0;
   var total = pg + ur;
   
-  // Opsional: Batasi nilai maksimal 100
   if (total > 100) total = 100;
   
   totalEl.value = total;
 }
 
 function saveEditKoreksi() {
-  var nisn = document.getElementById('editNisn').value;
-  var mapel = document.getElementById('editMapel').value;
-  var kelas = document.getElementById('editKelas').value;
-  var rombel = document.getElementById('editRombel').value;
+  var nisn = document.getElementById('editKoreksi_Nisn').value;
+  var mapel = document.getElementById('editKoreksi_Mapel').value;
+  var kelas = document.getElementById('editKoreksi_Kelas').value;
+  var rombel = document.getElementById('editKoreksi_Rombel').value;
 
-  var pgVal = parseInt(document.getElementById('editPG').value) || 0;
-  var urVal = parseInt(document.getElementById('editUr').value) || 0;
-  var totalVal = parseInt(document.getElementById('editTotal').value) || 0;
-
-  if (typeof getDB !== 'function') {
-    showToast('Fungsi Database tidak ditemukan', 'error');
-    return;
-  }
+  var pgVal = parseInt(document.getElementById('editKoreksi_PG').value) || 0;
+  var urVal = parseInt(document.getElementById('editKoreksi_Ur').value) || 0;
+  var totalVal = parseInt(document.getElementById('editKoreksi_Total').value) || 0;
   
   var db = getDB(kelas);
   if (!db) {
@@ -1145,25 +1164,35 @@ function saveEditKoreksi() {
   }
   var docId = kelas + '_' + rombel + '_' + mapel + '_' + nisn;
 
-  // Pastikan firebase.firestore tersedia jika menggunakan Timestamp
   var updateData = {
     nilaiPG: pgVal,
     nilaiUr: urVal,
     nilaiTotal: totalVal,
     submittedBy: 'guru_edit',
-    updatedAt: new Date() // Fallback jika firebase tidak terload, gunakan Date JS biasa
+    updatedAt: new Date() 
   };
   
   if (typeof firebase !== 'undefined' && firebase.firestore && firebase.firestore.FieldValue) {
     updateData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
   }
 
+  // Ubah tombol simpan jadi loading
+  var saveBtn = document.querySelector('#modalBody .btn-primary');
+  var originalBtnText = saveBtn.innerHTML;
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+
   db.collection('nilai').doc(docId).update(updateData).then(function() {
     showToast('Nilai berhasil diperbarui!');
     closeModal();
-    loadKorList();
+    loadKoreksiData(); // Reload tabel utama
   }).catch(function(e) {
+    console.error(e);
     showToast('Gagal menyimpan: ' + e.message, 'error');
+    if(saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalBtnText;
+    }
   });
 }
 /* === CETAK NILAI === */
