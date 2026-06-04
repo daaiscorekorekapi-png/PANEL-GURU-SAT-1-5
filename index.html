@@ -851,16 +851,14 @@ function hSUR(i,bobot){var v=parseInt(document.getElementById('skorUr'+i).value)
 function uAkhir(){var pg=0, ur=0;var pEl=document.getElementById('totalPG');var uEl=document.getElementById('totalUr');if(pEl)pg=parseInt(pEl.textContent)||0;if(uEl)ur=parseInt(uEl.textContent)||0;var t=Math.min(pg+ur,100);var aEl=document.getElementById('totalAkhir');if(aEl)aEl.textContent=t}
 function resetSkor(){for(var i=0;i<100;i++){var el=document.getElementById('jawabPG'+i);if(el)el.value='';var sEl=document.getElementById('skorPG'+i);if(sEl){sEl.textContent='0';sEl.className='font-bold text-muted'}var uEl=document.getElementById('skorUr'+i);if(uEl)uEl.value='0'}var tEl=document.getElementById('totalUr');if(tEl)tEl.textContent='0';uTPG();uAkhir();showToast('Skor direset')}
 
-/* ==================== KOREKSI NILAI (FINAL: PG OTOMATIS, URAIAN LANGSUNG MUNCUL) ==================== */
+/* ==================== KOREKSI NILAI (FIX FINAL: PG HITUNG ULANG 100% AKURAT) ==================== */
 
 function rKoreksi(c) {
   var h = '<div class="fade-in no-print space-y-4">';
   
-  // Header & Filter
   h += '<div class="card"><h3 class="font-bold text-light mb-4">Koreksi Nilai &mdash; <span class="text-kopAccent">' + activeClass + '</span></h3>';
   h += '<div class="grid md:grid-cols-3 gap-4 mb-4">';
   
-  // Filter Mapel
   h += '<div><label class="text-xs text-muted block mb-1">Mapel</label>';
   h += '<select id="koreksi_mapel" class="input-field" onchange="loadKoreksiData()">';
   h += '<option value="">-- Pilih Mapel --</option>';
@@ -869,7 +867,6 @@ function rKoreksi(c) {
   }
   h += '</select></div>';
 
-  // Filter Kelas
   h += '<div><label class="text-xs text-muted block mb-1">Kelas</label>';
   h += '<select id="koreksi_kelas" class="input-field" onchange="switchDB(this.value); loadKoreksiData()">';
   h += '<option value="">Semua</option>';
@@ -878,18 +875,16 @@ function rKoreksi(c) {
   }
   h += '</select></div>';
 
-  // Tombol Aksi
   h += '<div class="flex items-end gap-2"><button id="koreksi_btnShow" onclick="loadKoreksiData()" class="btn-primary text-sm flex-1"><i class="fas fa-search mr-2"></i>Tampilkan</button></div>';
-  h += '</div>'; // End Grid
+  h += '</div>';
 
-  // Info & Container
   h += '<div id="koreksi_info" class="hidden p-3 rounded-lg bg-info/10 border border-info/30 text-xs text-info mb-4"></div>';
   h += '<div id="koreksi_container"></div>';
-  h += '</div></div>'; // End Card
+  h += '</div></div>';
   
   h += '<div id="koreksi_mode_container" class="hidden fade-in"></div>';
   
-  // Modal Konfirmasi Hapus
+  // Modal Hapus
   h += '<div id="modal_hapus_koreksi" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/70 backdrop-blur-sm">';
   h += '<div class="card max-w-md w-full mx-4 border-2 border-danger/50 shadow-2xl shadow-danger/20">';
   h += '<div class="text-center p-6">';
@@ -949,7 +944,7 @@ function loadKoreksiData() {
     nilaiDocs.forEach(function(d, i) {
       var nPg = d.nilaiPG || 0;
       var nUr = d.nilaiUr || 0;
-      var t = d.nilaiTotal || 0; // Sudah hasil bagi 2
+      var t = d.nilaiTotal || 0; 
       var pred = t >= 90 ? 'A' : t >= 80 ? 'B' : t >= 70 ? 'C' : t >= 60 ? 'D' : 'E';
       var predC = t >= 90 ? 'text-success' : t >= 70 ? 'text-info' : t >= 60 ? 'text-warning' : 'text-danger';
       var dataRombel = d.rombel || kelas; 
@@ -1024,7 +1019,7 @@ function eksekusiHapusKoreksi(nisn, nama, mapel, kelas, rombel) {
   });
 }
 
-// ==================== MODE KOREKSI DETAIL (PG OTOMATIS) ====================
+// ==================== MODE KOREKSI DETAIL (PG DIHITUNG ULANG 100%) ====================
 
 function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
   var container = document.getElementById('koreksi_mode_container');
@@ -1033,7 +1028,7 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
   listContainer.style.display = 'none';
   container.classList.remove('hidden');
 
-  container.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-kopAccent"></i><p class="mt-2 text-muted">Memuat soal dan jawaban siswa...</p></div>';
+  container.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-kopAccent"></i><p class="mt-2 text-muted">Memuat soal dan menghitung skor otomatis...</p></div>';
 
   var db = getDB(kelas);
   if(!db){ showToast('DB Error','error'); return; }
@@ -1058,27 +1053,28 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     var pg = [], ur = [];
     filteredSoal.forEach(function(q){ if(q.type==='pg') pg.push(q); else ur.push(q); });
 
-    // BOBOT DIHITUNG MAX 100 PER TIPE
     var bobotPG = pg.length ? Math.round(100/pg.length) : 0;
     var bobotUr = ur.length ? Math.round(100/ur.length) : 0;
-    
     var mn = (MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
 
-    // === MENGHITUNG SKOR PG OTOMATIS DARI DATABASE ===
+    // === MAGIC FIX: HITUNG ULANG SKOR PG DARI JAWABAN, HAPUS ANGKA 0 YANG SALAH ===
     var autoSkorPG = 0;
     var pgBenar = 0;
     var pgSalah = 0;
+    
     pg.forEach(function(q, i){
-      var jawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
-      if(jawab === q.answer) {
-        autoSkorPG += bobotPG;
+      var jawabSiswa = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
+      var kunci = q.answer || '';
+      
+      if(jawabSiswa === kunci) {
+        autoSkorPG += bobotPG; // Tambah poin jika benar (contoh: 10 poin)
         pgBenar++;
       } else {
         pgSalah++;
       }
     });
 
-    // MENGHITUNG SKOR URAIAN AWAL DARI DATABASE
+    // Hitung Uraian dari database
     var autoSkorUr = 0;
     ur.forEach(function(q, i){
       autoSkorUr += (nilai.skorPerSoalUr && nilai.skorPerSoalUr[i]) ? nilai.skorPerSoalUr[i] : 0;
@@ -1087,51 +1083,49 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     // RENDER HALAMAN KOREKSI
     var h = '<div class="card">';
     
-    // Header Info
+    // Header
     h += '<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b border-border gap-4">';
     h += '<div>';
       h += '<h3 class="text-xl font-bold text-kopAccent"><i class="fas fa-check-double mr-2"></i>Lembar Koreksi Detail</h3>';
       h += '<div class="text-sm text-muted mt-1">Siswa: <b class="text-light">' + nilai.nama + '</b> (' + nilai.nisn + ') <span class="mx-2">|</span> ' + mn + ' <span class="mx-2">|</span> ' + kelas + ' ' + rombel + '</div>';
     h += '</div>';
     h += '<div class="flex flex-wrap items-center gap-2">';
-      h += '<button onclick="simpanKoreksiDetail(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="btn-primary shadow-lg"><i class="fas fa-save mr-2"></i>SIMPAN</button>';
-      h += '<button onclick="tampilkanModalHapus(\''+nisn+'\',\''+nilai.nama+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="bg-danger/20 text-danger font-bold py-2 px-4 rounded-lg text-sm hover:bg-danger/30 border border-danger/40 transition"><i class="fas fa-trash-alt mr-2"></i>HAPUS</button>';
+      h += '<button onclick="simpanKoreksiDetail(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="btn-primary shadow-lg"><i class="fas fa-save mr-2"></i>SIMPAN PERUBAHAN</button>';
       h += '<button onclick="kembaliKeDaftar()" class="btn-secondary text-muted hover:text-light"><i class="fas fa-arrow-left mr-1"></i>Kembali</button>';
     h += '</div>';
     h += '</div>';
 
-    // === PAPAN SKOR LIVE (PG, URAIAN, TOTAL) ===
+    // PAPAN SKOR LIVE
     h += '<div class="grid grid-cols-3 gap-4 mb-6">';
-    // Skor PG
     h += '<div class="bg-info/10 border border-info/30 rounded-xl p-4 text-center">';
-      h += '<div class="text-xs text-info font-bold mb-1"><i class="fas fa-list-ul mr-1"></i>SKOR PG (Maks 100)</div>';
+      h += '<div class="text-xs text-info font-bold mb-1"><i class="fas fa-list-ul mr-1"></i>SKOR PG (Otomatis)</div>';
       h += '<div id="livePg" class="text-4xl font-black text-info">' + autoSkorPG + '</div>';
+      h += '<div class="text-[10px] text-info/60 mt-1">' + pgBenar + ' benar × ' + bobotPG + ' poin</div>';
     h += '</div>';
-    // Skor Uraian
     h += '<div class="bg-warning/10 border border-warning/30 rounded-xl p-4 text-center">';
-      h += '<div class="text-xs text-warning font-bold mb-1"><i class="fas fa-pen mr-1"></i>SKOR URAIAN (Maks 100)</div>';
+      h += '<div class="text-xs text-warning font-bold mb-1"><i class="fas fa-pen mr-1"></i>SKOR URAIAN</div>';
       h += '<div id="liveUr" class="text-4xl font-black text-warning">' + autoSkorUr + '</div>';
     h += '</div>';
-    // Skor Total (Rata-rata)
     h += '<div class="bg-kopAccent/10 border-2 border-kopAccent/40 rounded-xl p-4 text-center">';
-      h += '<div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL (PG+Uraian)/2</div>';
+      h += '<div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL AKHIR</div>';
       h += '<div id="liveTotal" class="text-4xl font-black text-kopAccent">' + Math.round((autoSkorPG + autoSkorUr) / 2) + '</div>';
+      h += '<div class="text-[10px] text-kopAccent/60 mt-1">(' + autoSkorPG + ' + ' + autoSkorUr + ') / 2</div>';
     h += '</div>';
     h += '</div>';
 
-    // === RINGKASAN PG OTOMATIS ===
+    // RINGKASAN PG
     h += '<div class="bg-dark/60 border border-info/20 rounded-xl p-4 mb-6 grid grid-cols-3 gap-4 text-center">';
       h += '<div><div class="text-2xl font-black text-success">' + pgBenar + '</div><div class="text-xs text-success font-bold">BENAR</div></div>';
       h += '<div><div class="text-2xl font-black text-danger">' + pgSalah + '</div><div class="text-xs text-danger font-bold">SALAH</div></div>';
       h += '<div><div class="text-2xl font-black text-info">' + pg.length + '</div><div class="text-xs text-info font-bold">TOTAL SOAL PG</div></div>';
     h += '</div>';
 
-    // === BAGIAN PG: LANGSUNG MUNCUL HASILNYA (READONLY) ===
+    // BAGIAN PG: LANGSUNG MUNCUL HASILNYA 
     if(pg.length){
       h += '<div class="mb-8">';
       h += '<div class="flex justify-between items-center mb-3 border-b border-info/30 pb-2">';
-        h += '<h4 class="font-bold text-info text-sm"><i class="fas fa-list-ol mr-2"></i>Hasil Pilihan Ganda (Otomatis)</h4>';
-        h += '<span class="text-xs bg-info/20 text-info px-2 py-1 rounded font-bold">Skor PG: ' + autoSkorPG + '/100</span>';
+        h += '<h4 class="font-bold text-info text-sm"><i class="fas fa-robot mr-2"></i>Hasil Pilihan Ganda (Dikoreksi Otomatis)</h4>';
+        h += '<span class="text-xs bg-info/20 text-info px-2 py-1 rounded font-bold">' + bobotPG + ' Poin/Soal Benar</span>';
       h += '</div>';
       
       h += '<div class="space-y-2">';
@@ -1141,41 +1135,34 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
         var benar = (jawab === kunci);
         var skor = benar ? bobotPG : 0;
         
-        h += '<div class="flex items-center gap-3 p-3 rounded-lg border '+(benar?'border-success/30 bg-success/5':'border-danger/30 bg-danger/5')+' transition-all">';
+        h += '<div class="flex items-center gap-3 p-3 rounded-lg border '+(benar?'border-success/30 bg-success/5':'border-danger/30 bg-danger/5')+'">';
         
-        // Nomor & Status Icon
         h += '<div class="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full '+(benar?'bg-success/20':'bg-danger/20')+'">';
         h += '<i class="fas '+(benar?'fa-check text-success':'fa-times text-danger')+' text-sm"></i>';
         h += '</div>';
         
-        // Soal (dipotong jika panjang)
-        h += '<div class="flex-1 min-w-0">';
-        h += '<p class="text-xs text-light truncate">' + (i+1) + '. ' + q.text + '</p>';
+        h += '<div class="flex-1 min-w-0 hidden md:block">';
+        h += '<p class="text-xs text-muted truncate">' + q.text + '</p>';
         h += '</div>';
         
-        // Jawaban Siswa
         h += '<div class="flex items-center gap-2 flex-shrink-0">';
-        h += '<span class="text-xs text-muted">Siswa:</span>';
+        h += '<span class="text-xs text-muted">No.' + (i+1) + '</span>';
         h += '<span class="text-sm font-black w-6 text-center px-1 py-0.5 rounded '+(benar?'text-success bg-success/20':'text-danger bg-danger/20')+'">' + jawab + '</span>';
-        
-        // Kunci
-        h += '<span class="text-xs text-muted">Kunci:</span>';
+        h += '<i class="fas fa-arrow-right text-[8px] text-muted"></i>';
         h += '<span class="text-sm font-black w-6 text-center px-1 py-0.5 rounded bg-dark/60 text-success">' + kunci + '</span>';
-        
-        // Skor Per Soal
-        h += '<span class="text-xs font-bold ml-2 w-12 text-right '+(benar?'text-success':'text-danger')+'">' + skor + ' poin</span>';
+        h += '<span class="text-xs font-bold ml-2 w-14 text-right '+(benar?'text-success':'text-danger line-through')+'">+' + skor + '</span>';
         h += '</div>';
         
-        h += '</div>'; // End row
+        h += '</div>';
       });
       h += '</div></div>';
     }
 
-    // === BAGIAN URAIAN: JAWABAN LANGSUNG MUNCUL ===
+    // BAGIAN URAIAN
     h += '<div class="mb-6">';
     h += '<div class="flex justify-between items-center mb-3 border-b border-warning/30 pb-2">';
       h += '<h4 class="font-bold text-warning text-sm"><i class="fas fa-pen-fancy mr-2"></i>Penilaian Uraian</h4>';
-      h += '<span class="text-xs bg-warning/20 text-warning px-2 py-1 rounded font-bold">Skor Uraian: <span id="urHeaderScore">'+autoSkorUr+'</span>/100</span>';
+      h += '<span class="text-xs bg-warning/20 text-warning px-2 py-1 rounded font-bold">Maks ' + bobotUr + ' Poin/Soal</span>';
     h += '</div>';
 
     h += '<div class="space-y-6">';
@@ -1192,15 +1179,13 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
         h += '<div class="flex items-center gap-2">';
           h += '<span class="text-xs text-muted">Maks: ' + bobotUr + '</span>';
           h += '<input type="number" id="inputUr_'+idxUr+'" value="'+skorUr+'" min="0" max="'+bobotUr+'" oninput="hitungLiveTotal()" style="width: 70px; text-align: center; background-color: #1a1a1a; color: #facc15; border: 2px solid #facc15; border-radius: 8px; padding: 6px; font-size: 18px; font-weight: 900; outline: none;">';
-        h += '</div>';
+        h += '</div'>
       h += '</div>';
       
       h += '<p class="text-sm text-light mb-3 font-medium">' + q.text + '</p>';
       
       h += '<div class="grid md:grid-cols-2 gap-4">';
-        // Kunci / Pedoman
         h += '<div class="bg-dark/60 p-3 rounded border border-border"><div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-key mr-1"></i>Kunci / Pedoman:</div><div class="text-sm text-white font-medium leading-relaxed">' + kunciUr + '</div></div>';
-        // Jawaban Siswa (Readonly, langsung muncul)
         h += '<div class="bg-amber-950/40 p-3 rounded border-2 border-amber-400/40">';
           h += '<div class="text-xs text-amber-300 font-bold mb-2"><i class="fas fa-user-graduate mr-1"></i>Jawaban Siswa:</div>';
           h += '<div id="textUr_'+idxUr+'" class="w-full bg-dark/80 text-amber-100 text-sm font-medium leading-relaxed rounded-lg p-3 border border-amber-500/30 min-h-[100px] whitespace-pre-wrap">' + jawabanUr + '</div>';
@@ -1213,10 +1198,9 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     h += '</div></div>';
 
     h += '</div>'; // End Card
-    h += '<div class="mt-3 p-3 rounded-lg bg-danger/5 border border-danger/20 text-xs text-danger/80"><i class="fas fa-info-circle mr-1"></i>PG sudah <b>otomatis dikoreksi</b>. Untuk uraian, beri skor pada kolom kuning, lalu tekan <b>SIMPAN</b>.</div>';
+    h += '<div class="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 text-xs text-success/80"><i class="fas fa-check-circle mr-1"></i>PG sudah <b>100% terkoreksi otomatis</b> berdasarkan kunci. Untuk uraian, beri skor lalu tekan <b>SIMPAN PERUBAHAN</b>.</div>';
     
     container.innerHTML = h;
-    // hitungLiveTotal(); // Tidak perlu lagi dipanggil karena skor awal sudah dihitung manual di atas
 
   }).catch(function(e){
     console.error(e);
@@ -1230,27 +1214,21 @@ function kembaliKeDaftar() {
   document.getElementById('koreksi_container').style.display = '';
 }
 
-// ==================== HITUNG TOTAL LIVE (HANYA URAIAN YANG BERUBAH) ====================
+// ==================== HITUNG TOTAL LIVE (HANYA URAIAN YANG DIUBAH GURU) ====================
 function hitungLiveTotal() {
-  // Ambil skor PG yang sudah dihitung otomatis (dari teks di panel ringkasan)
   var pgEl = document.getElementById('livePg');
   var skorPG = parseInt(pgEl ? pgEl.textContent : '0') || 0;
 
-  // Hitung Uraian dari input guru
   var skorUr = 0;
   var elsUr = document.querySelectorAll('[id^="inputUr_"]');
   elsUr.forEach(function(el){ skorUr += parseInt(el.value)||0; });
   
-  // 3. Hitung Total (Rata-rata)
   var finalTotal = Math.round((skorPG + skorUr) / 2);
   
-  // Update UI
   var tEl = document.getElementById('liveTotal');
   var urEl = document.getElementById('liveUr');
-  var urHeaderEl = document.getElementById('urHeaderScore');
   
   if(urEl) urEl.textContent = skorUr;
-  if(urHeaderEl) urHeaderEl.textContent = skorUr;
   
   if(tEl) {
     tEl.textContent = finalTotal;
@@ -1260,82 +1238,77 @@ function hitungLiveTotal() {
   }
 }
 
-// ==================== SIMPAN KOREKSI (PG DIAMBIL DARI DATABASE, URAIAN DARI INPUT) ====================
+// ==================== SIMPAN KOREKSI (PG DIHITUNG ULANG, URAIAN DARI INPUT GURU) ====================
 function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
   var db = getDB(kelas);
   if(!db){ showToast('DB Error','error'); return; }
   var docId = kelas + '_' + rombel + '_' + mapel + '_' + nisn;
   
-  // Ambil kembali jawaban PG asli dari database (tidak bisa diubah guru)
-  var jawabanPG = [];
-  var skorPGTotal = 0;
-  var bobotPG = 0;
-  
-  // Kita perlu fetch soal lagi untuk hitung bobot PG yang benar
-  fetchSoal(mapel, kelas).then(function(soalDocs){
+  var btn = document.querySelector('#koreksi_mode_container .btn-primary');
+  var ori = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menghitung & Menyimpan...';
+
+  // FETCH ULANG UNTUK MASTIKAN SKOR PG 100% AKURAT
+  Promise.all([
+    db.collection('nilai').doc(docId).get(),
+    fetchSoal(mapel, kelas)
+  ]).then(function(results) {
+    var nilaiDoc = results[0];
+    var soalDocs = results[1];
+
+    if (!nilaiDoc.exists) throw new Error('Data siswa hilang');
+    var nilai = nilaiDoc.data();
+    
     var filteredSoal = soalDocs.filter(function(q){ return q.kelas === kelas; });
     var pg = [], ur = [];
     filteredSoal.forEach(function(q){ if(q.type==='pg') pg.push(q); else ur.push(q); });
-    
-    bobotPG = pg.length ? Math.round(100/pg.length) : 0;
-    
-    // Hitung ulang PG berdasarkan jawaban di database
-    return db.collection('nilai').doc(docId).get().then(function(nilaiDoc){
-      if(!nilaiDoc.exists) throw new Error('Data tidak ditemukan');
-      var nilai = nilaiDoc.data();
-      
-      pg.forEach(function(q, i){
-        var jawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
-        jawabanPG.push(jawab);
-        if(jawab === q.answer) skorPGTotal += bobotPG;
-      });
 
-      // Ambil Uraian dari input guru
-      var jawabanUr = [];
-      var skorPerSoalUr = [];
-      var skorUrTotal = 0;
-      
-      var elsUrVal = document.querySelectorAll('[id^="inputUr_"]');
-      
-      for(var i=0; i<elsUrVal.length; i++){
-         var s = parseInt(elsUrVal[i].value) || 0;
-         skorPerSoalUr.push(s);
-         // Jawaban uraian tidak berubah, jadi kita ambil dari data lama
-         jawabanUr.push((nilai.jawabanUr && nilai.jawabanUr[i]) ? nilai.jawabanUr[i] : '');
-         skorUrTotal += s;
-      }
-      
-      // RUMUS: Total = (PG + Uraian) / 2
-      var finalTotal = Math.round((skorPGTotal + skorUrTotal) / 2);
-      
-      var btn = document.querySelector('#koreksi_mode_container .btn-primary');
-      var ori = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
-      
-      var updateData = {
-        jawabanPG: jawabanPG,
-        jawabanUr: jawabanUr,
-        skorPerSoalUr: skorPerSoalUr,
-        nilaiPG: skorPGTotal,
-        nilaiUr: skorUrTotal,
-        nilaiTotal: finalTotal,
-        submittedBy: 'guru_koreksi_detail',
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      
-      return db.collection('nilai').doc(docId).update(updateData).then(function(){
-        showToast('Tersimpan! PG:'+skorPGTotal+' + Ur:'+skorUrTotal+' = Total: '+finalTotal, 'success');
-        btn.disabled = false;
-        btn.innerHTML = ori;
-        kembaliKeDaftar();
-        loadKoreksiData(); 
-      });
+    var bobotPG = pg.length ? Math.round(100/pg.length) : 0;
+    
+    // 1. HITUNG ULANG SKOR PG (MENGHAPUS BUG NILAI 0)
+    var skorPGTotal = 0;
+    var jawabanPG = [];
+    pg.forEach(function(q, i){
+      var jawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
+      jawabanPG.push(jawab);
+      if(jawab === q.answer) skorPGTotal += bobotPG;
+    });
+
+    // 2. AMBIL SKOR URAIAN DARI INPUT GURU
+    var skorPerSoalUr = [];
+    var skorUrTotal = 0;
+    var elsUrVal = document.querySelectorAll('[id^="inputUr_"]');
+    
+    for(var i=0; i<elsUrVal.length; i++){
+       var s = parseInt(elsUrVal[i].value) || 0;
+       skorPerSoalUr.push(s);
+       skorUrTotal += s;
+    }
+    
+    // 3. TOTAL FINAL
+    var finalTotal = Math.round((skorPGTotal + skorUrTotal) / 2);
+    
+    var updateData = {
+      jawabanPG: jawabanPG,
+      skorPerSoalUr: skorPerSoalUr,
+      nilaiPG: skorPGTotal,      // Skor PG yang sudah dihitung ulang (bukan 0 lagi)
+      nilaiUr: skorUrTotal,
+      nilaiTotal: finalTotal,
+      submittedBy: 'guru_koreksi_fix',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    return db.collection('nilai').doc(docId).update(updateData).then(function(){
+      showToast('Tersimpan! PG: '+skorPGTotal+' + Ur: '+skorUrTotal+' = Total: '+finalTotal, 'success');
+      btn.disabled = false;
+      btn.innerHTML = ori;
+      kembaliKeDaftar();
+      loadKoreksiData(); 
     });
   }).catch(function(e){
     showToast('Gagal menyimpan: '+e.message, 'error');
-    var btn = document.querySelector('#koreksi_mode_container .btn-primary');
-    if(btn){ btn.disabled = false; btn.innerHTML = '<i class="fas fa-save mr-2"></i>SIMPAN'; }
+    if(btn){ btn.disabled = false; btn.innerHTML = ori; }
   });
 }
 /* === CETAK NILAI === */
