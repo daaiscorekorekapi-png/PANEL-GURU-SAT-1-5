@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SAT Generator 2026 - Guru (Fixed)</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Source+Sans+3:wght@300;400;600;700&family=Times+New+Roman&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -157,7 +157,9 @@ body{font-family:'Source Sans 3',sans-serif;background:#0f1923;color:#e8ecf1;min
 .sidebar-overlay.active{display:block}
 .fade-in{animation:fi .3s ease forwards}
 
-/* Print Styles */
+/* =========================================
+   PRINT STYLES (SINKRON DENGAN KODE ADMIN)
+   ========================================= */
 .print-preview-wrap{background:#e5e7eb;padding:40px;border-radius:8px;display:flex;flex-direction:column;align-items:center;overflow-x:auto;margin-top:20px}
 .print-preview-sheet{
   background:white;color:black;width:210mm;min-height:297mm;padding:1.5cm 2cm 2cm;
@@ -171,7 +173,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0f1923;color:#e8ecf1;min
 .print-preview-sheet th{background:#f0f0f0;font-weight:bold;text-align:center}
 .print-preview-sheet .soal-item{margin-bottom:18px;page-break-inside:avoid;overflow:hidden}
 .print-preview-sheet .soal-num{float:left;font-weight:bold;width:30px}
-.print-preview-sheet .soal-text{display:block;margin-left:35px;font-size:12pt}
+.print-preview-sheet .soal-text{display:block;margin-left:35px;font-size:12pt;white-space:pre-wrap}
 .print-preview-sheet .opsi-w{margin-top:6px;margin-left:35px}
 .print-preview-sheet .opsi-r{display:block;margin-bottom:3pt;font-size:12pt}
 .print-preview-sheet .opsi-l{font-weight:bold}
@@ -367,9 +369,9 @@ function onJenisChange(){
   else{w.style.display='none';document.getElementById('rKelas').disabled=true}
 }
 
-function getGuruKelas(){if(!gData)return[];if(gData.jenis==='guru kelas')return[gData.kelas];return["Kelas 1","Kelas 2","Kelas 3","Kelas 4","Kelas 5"]}
-function getGuruRombel(){if(!gData)return['A'];if(Array.isArray(gData.rombel))return gData.rombel;if(gData.rombel)return[gData.rombel];return['A']}
-function getGuruNPSN(){return gData?gData.npsn:''}
+function getGuruKelas(){if(!gData)return[];if(gData.jenis==='guru kelas')return[gData.kelas];return["Kelas 1","Kelas 2","Kelas 3","Kelas 4","Kelas 5"];}
+function getGuruRombel(){if(!gData)return['A'];if(Array.isArray(gData.rombel))return gData.rombel;if(gData.rombel)return[gData.rombel];return['A'];}
+function getGuruNPSN(){return gData?gData.npsn:'';}
 function switchDB(kelas){
   if(kelas&&getGuruKelas().indexOf(kelas)>-1){
     activeClass=kelas;
@@ -678,14 +680,15 @@ function reloadbank(){
   });
 }
 
-/* === PRINT UTILITIES === */
+/* === PRINT UTILITIES (FIXED: Menggunakan CSS Kode Admin) === */
 function printFrame(content){
   var f=document.createElement('iframe');
   f.style.cssText='position:fixed;left:-9999px;top:0;width:210mm;height:297mm';
   document.body.appendChild(f);
   var d=f.contentDocument||f.contentWindow.document;
   d.open();
-  d.write('<!DOCTYPE html><html><head><title>Cetak</title><style>@page{size:A4 portrait;margin:0}body{margin:0;padding:0;font-family:"Times New Roman",serif;font-size:12pt;line-height:1.4;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}.kop{text-align:center;padding-bottom:10px;margin-bottom:20px;border-bottom:3px double #000}.kop h1{font-size:13pt;font-weight:bold;text-transform:uppercase;margin:0}.kop h2{font-size:16pt;font-weight:bold;text-transform:uppercase;margin:0}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #000;padding:6px 8pt;font-size:11pt;text-align:left;vertical-align:top}th{background:#f0f0f0!important;font-weight:bold;text-align:center}.soal-item{margin-bottom:18px;page-break-inside:avoid;overflow:hidden}.soal-num{float:left;font-weight:bold;width:30px}.soal-text{display:block;margin-left:35px;font-size:12pt}.opsi-w{margin-top:6px;margin-left:35px}.opsi-r{display:block;margin-bottom:3pt;font-size:12pt}.opsi-l{font-weight:bold}.soal-img{max-width:65%;max-height:160px;margin:6px 0 6px 35px;display:block}.opsi-img{max-width:45%;max-height:70px;vertical-align:middle;margin-left:4px}.answer-lines{margin-top:6px;margin-left:35px;border:1px dashed #bbb;height:70px;background:#fafafa}.kartu-page{width:210mm;height:297mm;background:white;color:black;font-family:"Times New Roman",serif;box-sizing:border-box;padding:0;margin:0 auto;page-break-after:always;position:relative;overflow:hidden}.kartu-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);width:100%;height:100%;gap:2mm}.kartu-item{border:3pt solid #1a2744;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;font-size:0;border-radius:6px;position:relative}.kartu-item::before{content:"";position:absolute;inset:2pt;border:1.5pt solid #c9a84c;border-radius:4px;pointer-events:none;z-index:1}.kartu-item::after{content:"";position:absolute;inset:4pt;border:0.5pt solid #1a2744;border-radius:3px;pointer-events:none;z-index:1}.kartu-header{background:#1a2744;border-bottom:2pt solid #c9a84c;padding:1.5% 4%;text-align:center;flex-shrink:0;position:relative;z-index:2}.kartu-header h3{font-size:clamp(7pt,2vh,11pt);text-transform:uppercase;margin:0;letter-spacing:0.5pt;color:#c9a84c;font-weight:900;line-height:1.2}.kartu-header h4{font-size:clamp(7pt,1.8vh,10pt);font-weight:800;margin:1pt 0 0;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;color:#fff}.kartu-body{padding:2% 5%;flex-grow:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2}.kartu-table{width:100%;border-collapse:collapse}.kartu-table td{padding:0;border:none;font-size:clamp(8pt,2.2vh,13pt);vertical-align:middle;line-height:1.5}.kartu-table td.lbl{font-weight:900;width:32%;white-space:nowrap;color:#1a2744}.kartu-table td.val{padding-left:2%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}.kartu-footer{margin-top:auto;border-top:1.5pt solid #c9a84c;padding:1.5% 5%;font-size:clamp(6pt,1.8vh,10pt);color:#1a2744;font-family:"Times New Roman",serif;word-break:break-all;flex-shrink:0;line-height:1.3;font-weight:800;background:#f5f0e0;position:relative;z-index:2}.kartu-item.kartu-kosong{border:none!important;background:transparent!important}.kartu-item.kartu-kosong::before,.kartu-item.kotak-kosong::after{display:none}.lembar-jawaban{width:210mm;min-height:297mm;background:white;color:black;font-family:"Times New Roman",serif;font-size:11pt;padding:2cm}.lembar-header{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.lembar-header h2{text-align:center;text-transform:uppercase;font-size:14pt;margin:0 0 10px}.lembar-bio{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:5px 20px;font-size:11pt}.lembar-bio label{font-weight:bold}.lembar-bio span{border-bottom:1px dotted #000;display:inline-block;width:100%}.lembar-section-title{background:#eee;font-weight:bold;padding:5px 10px;margin:20px 0 10px;border-left:5px solid #000;text-transform:uppercase;font-size:12pt}.lembar-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}.lembar-box{border:1px solid #000;padding:4px;text-align:center;font-size:10pt}.lembar-box-inner{display:grid;gap:2px}.lembar-opt{border:1px solid #ccc;height:20px;line-height:20px;font-size:10pt}</style></head><body>'+content+'</body></html>');
+  // CSS disini meniru persis CSS dari Kode Admin untuk hasil cetak yang sama
+  d.write('<!DOCTYPE html><html><head><title>Cetak</title><style>@page{size:A4 portrait;margin:1.5cm 2cm 2cm}body{margin:0;padding:0;font-family:"Times New Roman",serif;font-size:12pt;line-height:1.4;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}.kop{text-align:center;padding-bottom:10px;margin-bottom:20px;border-bottom:3px double #000}.kop h1{font-size:13pt;font-weight:bold;text-transform:uppercase;margin:0}.kop h2{font-size:16pt;font-weight:bold;text-transform:uppercase;margin:0}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #000;padding:6px 8pt;font-size:11pt;text-align:left;vertical-align:top}th{background:#f0f0f0!important;font-weight:bold;text-align:center}.soal-item{margin-bottom:18px;page-break-inside:avoid;overflow:hidden}.soal-num{float:left;font-weight:bold;width:30px}.soal-text{display:block;margin-left:35px;font-size:12pt;white-space:pre-wrap}.opsi-w{margin-top:6px;margin-left:35px}.opsi-r{display:block;margin-bottom:3pt;font-size:12pt}.opsi-l{font-weight:bold}.soal-img{max-width:65%;max-height:160px;margin:6px 0 6px 35px;display:block}.opsi-img{max-width:45%;max-height:70px;vertical-align:middle;margin-left:4px}.answer-lines{margin-top:6px;margin-left:35px;border:1px dashed #bbb;height:70px;background:#fafafa}.kartu-page{width:210mm;height:297mm;background:white;color:black;font-family:"Times New Roman",serif;box-sizing:border-box;padding:0;margin:0 auto;page-break-after:always;position:relative;overflow:hidden}.kartu-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr);width:100%;height:100%;gap:2mm}.kartu-item{border:3pt solid #1a2744;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;font-size:0;border-radius:6px;position:relative}.kartu-item::before{content:"";position:absolute;inset:2pt;border:1.5pt solid #c9a84c;border-radius:4px;pointer-events:none;z-index:1}.kartu-item::after{content:"";position:absolute;inset:4pt;border:0.5pt solid #1a2744;border-radius:3px;pointer-events:none;z-index:1}.kartu-header{background:#1a2744;border-bottom:2pt solid #c9a84c;padding:1.5% 4%;text-align:center;flex-shrink:0;position:relative;z-index:2}.kartu-header h3{font-size:clamp(7pt,2vh,11pt);text-transform:uppercase;margin:0;letter-spacing:0.5pt;color:#c9a84c;font-weight:900;line-height:1.2}.kartu-header h4{font-size:clamp(7pt,1.8vh,10pt);font-weight:800;margin:1pt 0 0;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;color:#fff}.kartu-body{padding:2% 5%;flex-grow:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2}.kartu-table{width:100%;border-collapse:collapse}.kartu-table td{padding:0;border:none;font-size:clamp(8pt,2.2vh,13pt);vertical-align:middle;line-height:1.5}.kartu-table td.lbl{font-weight:900;width:32%;white-space:nowrap;color:#1a2744}.kartu-table td.val{padding-left:2%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}.kartu-footer{margin-top:auto;border-top:1.5pt solid #c9a84c;padding:1.5% 5%;font-size:clamp(6pt,1.8vh,10pt);color:#1a2744;font-family:"Times New Roman",serif;word-break:break-all;flex-shrink:0;line-height:1.3;font-weight:800;background:#f5f0e0;position:relative;z-index:2}.kartu-item.kartu-kosong{border:none!important;background:transparent!important}.kartu-item.kartu-kosong::before,.kartu-item.kotak-kosong::after{display:none}.lembar-jawaban{width:210mm;min-height:297mm;background:white;color:black;font-family:"Times New Roman",serif;font-size:11pt;padding:2cm}.lembar-header{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:20px}.lembar-header h2{text-align:center;text-transform:uppercase;font-size:14pt;margin:0 0 10px}.lembar-bio{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:5px 20px;font-size:11pt}.lembar-bio label{font-weight:bold}.lembar-bio span{border-bottom:1px dotted #000;display:inline-block;width:100%}.lembar-section-title{background:#eee!important;font-weight:bold;padding:5px 10px;margin:20px 0 10px;border-left:5px solid #000;text-transform:uppercase;font-size:12pt}.lembar-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}.lembar-box{border:1px solid #000;padding:4px;text-align:center;font-size:10pt}.lembar-box-inner{display:grid;gap:2px}.lembar-opt{border:1px solid #ccc;height:20px;line-height:20px;font-size:10pt}</style></head><body>'+content+'</body></html>');
   d.close();
   setTimeout(function(){f.contentWindow.focus();f.contentWindow.print();setTimeout(function(){try{document.body.removeChild(f)}catch(e){}},3000)},600);
 }
@@ -856,7 +859,7 @@ function resetSkor(){for(var i=0;i<100;i++){var el=document.getElementById('jawa
 function rKoreksi(c) {
   var h = '<div class="fade-in no-print space-y-4">';
   
-  h += '<div class="card"><h3 class="font-bold text-light mb-4">Koreksi Nilai &mdash; <span class="text-kopAccent">' + activeClass + '</span></h3>';
+  h += '<div class="card"><h3 class="font-bold text-light mb-4">Koreksi Nilai &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3>';
   h += '<div class="grid md:grid-cols-3 gap-4 mb-4">';
   
   h += '<div><label class="text-xs text-muted block mb-1">Mapel</label>';
@@ -1086,32 +1089,32 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     
     // Header
     h += '<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b border-border gap-4">';
-    h += '<div>';
-      h += '<h3 class="text-xl font-bold text-kopAccent"><i class="fas fa-check-double mr-2"></i>Lembar Koreksi Detail</h3>';
-      h += '<div class="text-sm text-muted mt-1">Siswa: <b class="text-light">' + nilai.nama + '</b> (' + nilai.nisn + ') <span class="mx-2">|</span> ' + mn + ' <span class="mx-2">|</span> ' + kelas + ' ' + rombel + '</div>';
-    h += '</div>';
-    h += '<div class="flex flex-wrap items-center gap-2">';
-      h += '<button onclick="simpanKoreksiDetail(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="btn-primary shadow-lg"><i class="fas fa-save mr-2"></i>SIMPAN PERUBAHAN</button>';
-      h += '<button onclick="kembaliKeDaftar()" class="btn-secondary text-muted hover:text-light"><i class="fas fa-arrow-left mr-1"></i>Kembali</button>';
-    h += '</div>';
+      h += '<div>';
+        h += '<h3 class="text-xl font-bold text-kopAccent"><i class="fas fa-check-double mr-2"></i>Lembar Koreksi Detail</h3>';
+        h += '<div class="text-sm text-muted mt-1">Siswa: <b class="text-light">' + nilai.nama + '</b> (' + nilai.nisn + ') <span class="mx-2">|</span> ' + mn + ' <span class="mx-2">|</span> ' + kelas + ' ' + rombel + '</div>';
+      h += '</div>';
+      h += '<div class="flex flex-wrap items-center gap-2">';
+        h += '<button onclick="simpanKoreksiDetail(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\')" class="btn-primary shadow-lg"><i class="fas fa-save mr-2"></i>SIMPAN PERUBAHAN</button>';
+        h += '<button onclick="kembaliKeDaftar()" class="btn-secondary text-muted hover:text-light"><i class="fas fa-arrow-left mr-1"></i>Kembali</button>';
+      h += '</div>';
     h += '</div>';
 
     // PAPAN SKOR LIVE
     h += '<div class="grid grid-cols-3 gap-4 mb-6">';
-    h += '<div class="bg-info/10 border border-info/30 rounded-xl p-4 text-center">';
-      h += '<div class="text-xs text-info font-bold mb-1"><i class="fas fa-list-ul mr-1"></i>SKOR PG (Otomatis)</div>';
-      h += '<div id="livePg" class="text-4xl font-black text-info">' + autoSkorPG + '</div>';
-      h += '<div class="text-[10px] text-info/60 mt-1">' + pgBenar + ' benar × ' + bobotPG + ' poin</div>';
-    h += '</div>';
-    h += '<div class="bg-warning/10 border border-warning/30 rounded-xl p-4 text-center">';
-      h += '<div class="text-xs text-warning font-bold mb-1"><i class="fas fa-pen mr-1"></i>SKOR URAIAN</div>';
-      h += '<div id="liveUr" class="text-4xl font-black text-warning">' + autoSkorUr + '</div>';
-    h += '</div>';
-    h += '<div class="bg-kopAccent/10 border-2 border-kopAccent/40 rounded-xl p-4 text-center">';
-      h += '<div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL AKHIR</div>';
-      h += '<div id="liveTotal" class="text-4xl font-black text-kopAccent">' + Math.round((autoSkorPG + autoSkorUr) / 2) + '</div>';
-      h += '<div class="text-[10px] text-kopAccent/60 mt-1">(' + autoSkorPG + ' + ' + autoSkorUr + ') / 2</div>';
-    h += '</div>';
+      h += '<div class="bg-info/10 border border-info/30 rounded-xl p-4 text-center">';
+        h += '<div class="text-xs text-info font-bold mb-1"><i class="fas fa-list-ul mr-1"></i>SKOR PG (Otomatis)</div>';
+        h += '<div id="livePg" class="text-4xl font-black text-info">' + autoSkorPG + '</div>';
+        h += '<div class="text-[10px] text-info/60 mt-1">' + pgBenar + ' benar × ' + bobotPG + ' poin</div>';
+      h += '</div>';
+      h += '<div class="bg-warning/10 border border-warning/30 rounded-xl p-4 text-center">';
+        h += '<div class="text-xs text-warning font-bold mb-1"><i class="fas fa-pen mr-1"></i>SKOR URAIAN</div>';
+        h += '<div id="liveUr" class="text-4xl font-black text-warning">' + autoSkorUr + '</div>';
+      h += '</div>';
+      h += '<div class="bg-kopAccent/10 border-2 border-kopAccent/40 rounded-xl p-4 text-center">';
+        h += '<div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL AKHIR</div>';
+        h += '<div id="liveTotal" class="text-4xl font-black text-kopAccent">' + Math.round((autoSkorPG + autoSkorUr) / 2) + '</div>';
+        h += '<div class="text-[10px] text-kopAccent/60 mt-1">(' + autoSkorPG + ' + ' + autoSkorUr + ') / 2</div>';
+      h += '</div>';
     h += '</div>';
 
     // RINGKASAN PG
@@ -1404,7 +1407,7 @@ function saveSiswa(){
     }
   }).then(function(){if(arguments[0]){showToast('Data siswa berhasil disimpan!');closeModal();reloadSiswa()}}).catch(function(e){showToast('Gagal: '+e.message,'error')});
 }
-function delSiswa(id,kelas){if(!confirm('Hapus?'))return;getDB(kelas||activeClass).collection('siswa').doc(id).delete().then(function(){showToast('Dihapus');reloadSiswa()}).catch(function(){showToast('Gagal','error')})}
+function delSiswa(id,kelas){if(!confirm('Hapus?'))return;getDB(kelas||activeClass).collection('siswa').doc(id).delete().then(function(){showToast('Dihapus');reloadSiswa()}).catch(function(){showToast('Gagal','error')});}
 
 /* === TOKEN UJIAN === */
 function rToken(c){
@@ -1441,7 +1444,7 @@ function genToken(){
   if(!db){showToast('DB error','error');return}
   db.collection('tokens').add({token:token,mapel:mapel,kelas:kelasDipilih,rombel:rombels,npsn:getGuruNPSN(),sekolah:gData.sekolah,guruNip:gData.nip,guruNama:gData.nama,startTime:firebase.firestore.Timestamp.fromDate(now),endTime:firebase.firestore.Timestamp.fromDate(new Date(now.getTime()+dur*60000)),durationMinutes:dur,isActive:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()}).then(function(){showToast('Token: '+token+' berhasil dibuat untuk '+kelasDipilih+'!');closeModal();reloadToken()}).catch(function(e){showToast('Gagal: '+e.message,'error')});
 }
-function delToken(id,kelas){if(!confirm('Hapus token?'))return;getDB(kelas||activeClass).collection('tokens').doc(id).delete().then(function(){showToast('Dihapus');reloadToken()}).catch(function(){showToast('Gagal','error')})}
+function delToken(id,kelas){if(!confirm('Hapus token?'))return;getDB(kelas||activeClass).collection('tokens').doc(id).delete().then(function(){showToast('Dihapus');reloadToken()}).catch(function(){showToast('Gagal','error')});}
 
 /* === KARTU UJIAN === */
 function rKartuUjian(c){
