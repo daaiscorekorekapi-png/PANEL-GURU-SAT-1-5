@@ -1145,26 +1145,14 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     var mn = (MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
 
     var autoSkorPG = 0; var pgBenar = 0; var pgSalah = 0;
-    
-    // PERBAIKAN: Deteksi format jawaban (Array Object vs Array String)
     pg.forEach(function(q, i){
-      var rawJawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
-      var jawabSiswa = (typeof rawJawab === 'object' && rawJawab !== null) ? (rawJawab.jawaban || '') : rawJawab;
+      var jawabSiswa = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
       var kunci = q.answer || '';
-      if(jawabSiswa.toString().toUpperCase() === kunci.toString().toUpperCase()) { 
-        autoSkorPG += bobotPG; pgBenar++; 
-      } else { pgSalah++; }
+      if(jawabSiswa.toUpperCase() === kunci.toUpperCase()) { autoSkorPG += bobotPG; pgBenar++; } else { pgSalah++; }
     });
-    autoSkorPG = Math.min(autoSkorPG, 100); // Batas maks 100
 
     var autoSkorUr = 0;
-    ur.forEach(function(q, i){ 
-      autoSkorUr += (nilai.skorPerSoalUr && nilai.skorPerSoalUr[i]) ? nilai.skorPerSoalUr[i] : 0; 
-    });
-    autoSkorUr = Math.min(autoSkorUr, 100); // Batas maks 100
-
-    // PERBAIKAN: Rumus SAT (PG + Uraian), tidak dibagi 2 lagi
-    var totalAwal = Math.min(autoSkorPG + autoSkorUr, 100);
+    ur.forEach(function(q, i){ autoSkorUr += (nilai.skorPerSoalUr && nilai.skorPerSoalUr[i]) ? nilai.skorPerSoalUr[i] : 0; });
 
     var h = '<div class="card">';
     h += '<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b border-border gap-4">';
@@ -1190,9 +1178,8 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
       h += '</div>';
       h += '<div class="bg-kopAccent/10 border-2 border-kopAccent/40 rounded-xl p-4 text-center">';
         h += '<div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL AKHIR</div>';
-        // PERBAIKAN TAMPILAN: PG + Uraian (Maks 100)
-        h += '<div id="liveTotal" class="text-4xl font-black text-kopAccent">' + totalAwal + '</div>';
-        h += '<div class="text-[10px] text-kopAccent/60 mt-1">(' + autoSkorPG + ' + ' + autoSkorUr + ')</div>';
+        h += '<div id="liveTotal" class="text-4xl font-black text-kopAccent">' + Math.round((autoSkorPG + autoSkorUr) / 2) + '</div>';
+        h += '<div class="text-[10px] text-kopAccent/60 mt-1">(' + autoSkorPG + ' + ' + autoSkorUr + ') / 2</div>';
       h += '</div>';
     h += '</div>';
 
@@ -1211,12 +1198,11 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
       h += '<div class="space-y-2">';
       pg.forEach(function(q, i){
         var kunci = q.answer || '';
-        var rawJawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '-';
-        var jawab = (typeof rawJawab === 'object' && rawJawab !== null) ? (rawJawab.jawaban || '-') : rawJawab;
-        var benar = (jawab.toString().toUpperCase() === kunci.toString().toUpperCase());
+        var jawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '-';
+        var benar = (jawab.toUpperCase() === kunci.toUpperCase());
         var skor = benar ? bobotPG : 0;
-        var tampilJawab = jawab !== '-' ? jawab.toString().toUpperCase() : '-';
-        var tampilKunci = kunci.toString().toUpperCase();
+        var tampilJawab = jawab !== '-' ? jawab.toUpperCase() : '-';
+        var tampilKunci = kunci.toUpperCase();
         h += '<div class="flex items-center gap-3 p-3 rounded-lg border '+(benar?'border-success/30 bg-success/5':'border-danger/30 bg-danger/5')+'">';
         h += '<div class="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full '+(benar?'bg-success/20':'bg-danger/20')+'">';
         h += '<i class="fas '+(benar?'fa-check text-success':'fa-times text-danger')+' text-sm"></i>';
@@ -1251,7 +1237,7 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
         h += '<span class="bg-warning/20 text-warning px-2 py-0.5 rounded text-xs font-bold">Soal No. ' + (pg.length + i + 1) + '</span>';
         h += '<div class="flex items-center gap-2">';
           h += '<span class="text-xs text-muted">Maks: ' + bobotUr + '</span>';
-          h += '<input type="number" id="inputUr_'+idxUr+'" value="'+skorUr+'" min="0" max="'+bobotUr+'" oninput="hitungLiveTotal('+bobotUr+')" style="width: 70px; text-align: center; background-color: #1a1a1a; color: #facc15; border: 2px solid #facc15; border-radius: 8px; padding: 6px; font-size: 18px; font-weight: 900; outline: none;">';
+          h += '<input type="number" id="inputUr_'+idxUr+'" value="'+skorUr+'" min="0" max="'+bobotUr+'" oninput="hitungLiveTotal()" style="width: 70px; text-align: center; background-color: #1a1a1a; color: #facc15; border: 2px solid #facc15; border-radius: 8px; padding: 6px; font-size: 18px; font-weight: 900; outline: none;">';
         h += '</div>';
       h += '</div>';
       h += '<p class="text-sm text-light mb-3 font-medium">' + q.text + '</p>';
@@ -1267,8 +1253,8 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     if(!ur.length) h += '<div class="text-center text-muted py-8"><i class="fas fa-file-alt text-3xl mb-2 block"></i><p>Tidak ada soal uraian.</p></div>';
     h += '</div></div>';
 
-    h += '</div>'; 
-    h += '<div class="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 text-xs text-success/80"><i class="fas fa-check-circle mr-1"></i>PG sudah <b>100% terkoreksi otomatis</b>. Untuk uraian, beri skor lalu tekan <b>SIMPAN PERUBAHAN</b>.<br><b>Rumus Nilai Akhir: PG + Uraian (Maks 100)</b></div>';
+    h += '</div>'; // End Card
+    h += '<div class="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 text-xs text-success/80"><i class="fas fa-check-circle mr-1"></i>PG sudah <b>100% terkoreksi otomatis</b> (tidak membedakan huruf besar/kecil). Untuk uraian, beri skor lalu tekan <b>SIMPAN PERUBAHAN</b>.</div>';
     
     container.innerHTML = h;
 
@@ -1277,6 +1263,34 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel) {
     showToast('Gagal memuat detail: '+e.message, 'error');
     kembaliKeDaftar();
   });
+}
+
+function kembaliKeDaftar() {
+  document.getElementById('koreksi_mode_container').classList.add('hidden');
+  document.getElementById('koreksi_container').style.display = '';
+}
+
+function hitungLiveTotal() {
+  var pgEl = document.getElementById('livePg');
+  var skorPG = parseInt(pgEl ? pgEl.textContent : '0') || 0;
+
+  var skorUr = 0;
+  var elsUr = document.querySelectorAll('[id^="inputUr_"]');
+  elsUr.forEach(function(el){ skorUr += parseInt(el.value)||0; });
+  
+  var finalTotal = Math.round((skorPG + skorUr) / 2);
+  
+  var tEl = document.getElementById('liveTotal');
+  var urEl = document.getElementById('liveUr');
+  
+  if(urEl) urEl.textContent = skorUr;
+  
+  if(tEl) {
+    tEl.textContent = finalTotal;
+    tEl.style.transform = 'scale(1.1)';
+    tEl.style.transition = 'transform 0.2s ease';
+    setTimeout(function(){ tEl.style.transform = 'scale(1)'; }, 200);
+  }
 }
 
 function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
@@ -1304,63 +1318,45 @@ function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
     filteredSoal.forEach(function(q){ if(q.type==='pg') pg.push(q); else ur.push(q); });
 
     var bobotPG = pg.length ? Math.round(100/pg.length) : 0;
-    var bobotUr = ur.length ? Math.round(100/ur.length) : 0;
-    
     var skorPGTotal = 0;
-    var jawabanPGArray = [];
-    
+    var jawabanPG = [];
     pg.forEach(function(q, i){
-      var rawJawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
-      var jawab = (typeof rawJawab === 'object' && rawJawab !== null) ? (rawJawab.jawaban || '') : rawJawab;
-      
-      jawabanPGArray.push(jawab.toString());
-      if(jawab.toString().toUpperCase() === (q.answer || '').toString().toUpperCase()) {
+      var jawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
+      jawabanPG.push(jawab);
+      if(jawab.toUpperCase() === (q.answer || '').toUpperCase()) {
         skorPGTotal += bobotPG;
       }
     });
-    skorPGTotal = Math.min(skorPGTotal, 100);
 
     var skorPerSoalUr = [];
     var skorUrTotal = 0;
     var elsUrVal = document.querySelectorAll('[id^="inputUr_"]');
     for(var i=0; i<elsUrVal.length; i++){
        var s = parseInt(elsUrVal[i].value) || 0;
-       if(s > bobotUr) s = bobotUr;
-       if(s < 0) s = 0;
        skorPerSoalUr.push(s);
        skorUrTotal += s;
     }
-    skorUrTotal = Math.min(skorUrTotal, 100);
     
-    var finalTotal = Math.min(skorPGTotal + skorUrTotal, 100);
+    var finalTotal = Math.round((skorPGTotal + skorUrTotal) / 2);
     
     var updateData = {
-      jawabanPG: jawabanPGArray,
+      jawabanPG: jawabanPG,
       skorPerSoalUr: skorPerSoalUr,
       nilaiPG: skorPGTotal,      
       nilaiUr: skorUrTotal,
       nilaiTotal: finalTotal,
-      submittedBy: 'guru_koreksi_fix', 
-      tokenUsed: nilai.tokenUsed || '',
+      submittedBy: 'guru_koreksi_fix',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    return db.collection('nilai').doc(docId).update(updateData);
-
-  }).then(function(){
-    // Jika berhasil simpan ke Firebase
-    showToast('Berhasil disimpan!', 'success');
-    
-    // Tutup halaman koreksi secara manual (tanpa memanggil fungsi global)
-    document.getElementById('koreksi_mode_container').classList.add('hidden');
-    document.getElementById('koreksi_mode_container').innerHTML = '';
-    document.getElementById('koreksi_container').style.display = '';
-    
-    // Refresh tabel daftar siswa
-    loadKoreksiData(); 
-
+    return db.collection('nilai').doc(docId).update(updateData).then(function(){
+      showToast('Tersimpan! PG: '+skorPGTotal+' + Ur: '+skorUrTotal+' = Total: '+finalTotal, 'success');
+      btn.disabled = false;
+      btn.innerHTML = ori;
+      kembaliKeDaftar();
+      loadKoreksiData(); 
+    });
   }).catch(function(e){
-    // Jika gagal simpan ke Firebase
     showToast('Gagal menyimpan: '+e.message, 'error');
     if(btn){ btn.disabled = false; btn.innerHTML = ori; }
   });
@@ -1380,7 +1376,7 @@ function loadCetakNilai(){
     var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
     var h='<div class="card"><div class="flex justify-between items-center mb-4"><h4 class="font-bold text-light">'+mn+' &mdash; '+kelas+(rombel?' Rombel '+rombel:'')+'</h4><span class="text-xs text-muted">'+docs.length+' siswa</span></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">NISN</th><th class="p-2 text-left">Nama</th><th class="p-2 text-center">Rombel</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center font-bold">Total</th><th class="p-2 text-center">Predikat</th></tr></thead><tbody>';
     var sumTotal=0; docs.forEach(function(d,i){
-      var t = Math.min((d.nilaiPG||0) + (d.nilaiUr||0), 100); sumTotal+=t; var pred=t>=90?'A':t>=80?'B':t>=70?'C':t>=60?'D':'E', predC=t>=90?'text-success':t>=70?'text-info':t>=60?'text-warning':'text-danger';
+      var t=d.nilaiTotal||0; sumTotal+=t; var pred=t>=90?'A':t>=80?'B':t>=70?'C':t>=60?'D':'E', predC=t>=90?'text-success':t>=70?'text-info':t>=60?'text-warning':'text-danger';
       h+='<tr class="border-t border-border"><td class="p-2 font-bold">'+(i+1)+'</td><td class="p-2 font-mono text-xs">'+d.nisn+'</td><td class="p-2 font-semibold">'+d.nama+'</td><td class="p-2 text-center text-xs">'+d.rombel+'</td><td class="p-2 text-center text-info">'+(d.nilaiPG||0)+'</td><td class="p-2 text-center text-warning">'+(d.nilaiUr||0)+'</td><td class="p-2 text-center font-bold text-kopAccent">'+t+'</td><td class="p-2 text-center font-bold '+predC+'">'+pred+'</td></tr>';
     });
     var avg=docs.length?Math.round(sumTotal/docs.length):0;
