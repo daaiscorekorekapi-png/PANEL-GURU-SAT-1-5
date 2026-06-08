@@ -1309,41 +1309,39 @@ function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
     var skorPGTotal = 0;
     var jawabanPGArray = [];
     
-    // PERBAIKAN: Mengkonversi Object ke String agar tidak error di DB
     pg.forEach(function(q, i){
       var rawJawab = (nilai.jawabanPG && nilai.jawabanPG[i]) ? nilai.jawabanPG[i] : '';
       var jawab = (typeof rawJawab === 'object' && rawJawab !== null) ? (rawJawab.jawaban || '') : rawJawab;
       
-      jawabanPGArray.push(jawab.toString()); // Pastikan dikirim sebagai String ke DB
+      jawabanPGArray.push(jawab.toString());
       if(jawab.toString().toUpperCase() === (q.answer || '').toString().toUpperCase()) {
         skorPGTotal += bobotPG;
       }
     });
-    skorPGTotal = Math.min(skorPGTotal, 100); // Batas maks 100
+    skorPGTotal = Math.min(skorPGTotal, 100);
 
     var skorPerSoalUr = [];
     var skorUrTotal = 0;
     var elsUrVal = document.querySelectorAll('[id^="inputUr_"]');
     for(var i=0; i<elsUrVal.length; i++){
        var s = parseInt(elsUrVal[i].value) || 0;
-       if(s > bobotUr) s = bobotUr; // Batasan maksimal per soal
+       if(s > bobotUr) s = bobotUr;
        if(s < 0) s = 0;
        skorPerSoalUr.push(s);
        skorUrTotal += s;
     }
-    skorUrTotal = Math.min(skorUrTotal, 100); // Batas maks 100
+    skorUrTotal = Math.min(skorUrTotal, 100);
     
-    // PERBAIKAN: Rumus SAT yang benar
     var finalTotal = Math.min(skorPGTotal + skorUrTotal, 100);
     
     var updateData = {
-      jawabanPG: jawabanPGArray, // Array of String
+      jawabanPG: jawabanPGArray,
       skorPerSoalUr: skorPerSoalUr,
       nilaiPG: skorPGTotal,      
       nilaiUr: skorUrTotal,
       nilaiTotal: finalTotal,
       submittedBy: 'guru_koreksi_fix', 
-      tokenUsed: nilai.tokenUsed || '', // Pertahankan token asli
+      tokenUsed: nilai.tokenUsed || '',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
@@ -1351,7 +1349,9 @@ function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
       showToast('Tersimpan! PG: '+skorPGTotal+' + Ur: '+skorUrTotal+' = Total: '+finalTotal, 'success');
       btn.disabled = false;
       btn.innerHTML = ori;
-      kembaliKeDaftar();
+      
+      // PERBAIKAN: Huruf K besar sesuai dengan fungsi yang ada di kode Anda
+      KembaliKeDaftar(); 
       loadKoreksiData(); 
     });
   }).catch(function(e){
