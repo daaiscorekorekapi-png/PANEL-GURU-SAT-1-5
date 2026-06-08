@@ -1345,16 +1345,22 @@ function simpanKoreksiDetail(nisn, mapel, kelas, rombel) {
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    return db.collection('nilai').doc(docId).update(updateData).then(function(){
-      showToast('Tersimpan! PG: '+skorPGTotal+' + Ur: '+skorUrTotal+' = Total: '+finalTotal, 'success');
-      btn.disabled = false;
-      btn.innerHTML = ori;
-      
-      // PERBAIKAN: Huruf K besar sesuai dengan fungsi yang ada di kode Anda
-      KembaliKeDaftar(); 
-      loadKoreksiData(); 
-    });
+    return db.collection('nilai').doc(docId).update(updateData);
+
+  }).then(function(){
+    // Jika berhasil simpan ke Firebase
+    showToast('Berhasil disimpan!', 'success');
+    
+    // Tutup halaman koreksi secara manual (tanpa memanggil fungsi global)
+    document.getElementById('koreksi_mode_container').classList.add('hidden');
+    document.getElementById('koreksi_mode_container').innerHTML = '';
+    document.getElementById('koreksi_container').style.display = '';
+    
+    // Refresh tabel daftar siswa
+    loadKoreksiData(); 
+
   }).catch(function(e){
+    // Jika gagal simpan ke Firebase
     showToast('Gagal menyimpan: '+e.message, 'error');
     if(btn){ btn.disabled = false; btn.innerHTML = ori; }
   });
