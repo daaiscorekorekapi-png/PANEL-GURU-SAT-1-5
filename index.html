@@ -936,6 +936,7 @@ function rCetakNilai(c){
   c.innerHTML=h;
 }
 
+/* === CETAK NILAI (FIXED: RE-CALCULATE DINAMIS /35 vs /60) === */
 function loadCetakNilai(){
   var mapel=document.getElementById('cnM').value,kelas=document.getElementById('cnK').value||activeClass,rombel=document.getElementById('cnR').value;
   if(!mapel){document.getElementById('cnBox').innerHTML='';return}
@@ -944,25 +945,35 @@ function loadCetakNilai(){
   fetchNilai(mapel,kelas,rombel).then(function(docs){
     if(!docs.length){box.innerHTML='<div class="card text-center py-8"><p class="text-muted">Belum ada nilai tersimpan.</p></div>';return}
     var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
-    var h='<div class="card"><div class="flex justify-between items-center mb-4"><h4 class="font-bold text-light">'+mn+' &mdash; '+kelas+(rombel?' Rombel '+rombel:'')+'</h4><span class="text-xs text-muted">'+docs.length+' siswa</span></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">NISN</th><th class="p-2 text-left">Nama</th><th class="p-2 text-center">Rombel</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center font-bold">Total</th><th class="p-2 text-center">Predikat</th></tr></thead><tbody>';
     
-    // Tentukan pembagi berdasarkan kelas
+    // Tentukan pembagi: 35 untuk Kelas 1-2, 60 untuk lainnya
     var pembagi = (kelas === 'Kelas 1' || kelas === 'Kelas 2') ? 35 : 60;
+    
+    var h='<div class="card"><div class="flex justify-between items-center mb-4"><h4 class="font-bold text-light">'+mn+' &mdash; '+kelas+(rombel?' Rombel '+rombel:'')+'</h4><span class="text-xs text-muted">'+docs.length+' siswa</span></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">NISN</th><th class="p-2 text-left">Nama</th><th class="p-2 text-center">Rombel</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center font-bold">Total</th><th class="p-2 text-center">Predikat</th></tr></thead><tbody>';
     
     var sumTotal=0;
     docs.forEach(function(d,i){
-      var t=d.nilaiTotal||0;
-      sumTotal+=t;
+      // --- RE-CALCULATE NILAI AKHIR (PENTING) ---
+      // Kita ambil nilai mentah PG dan Ur dari DB, lalu hitung ulang sesuai kelas
+      var pgMentah = d.nilaiPG || 0;
+      var urMentah = d.nilaiUr || 0;
+      var totalPoin = pgMentah + urMentah;
+      var nilaiAkhir = Math.min(100, Math.round((totalPoin / pembagi) * 100));
+      // ---------------------------------------------
+
+      sumTotal += nilaiAkhir;
       
-      // LOGIKA PREDIKAT (FIXED)
+      // LOGIKA PREDIKAT
       var pred='',predC='';
-      if(t >= 80){pred='A';predC='text-success';} 
-      else if(t >= 70){pred='B';predC='text-info';} 
-      else if(t >= 60){pred='C';predC='text-warning';} 
+      if(nilaiAkhir >= 80){pred='A';predC='text-success';} 
+      else if(nilaiAkhir >= 70){pred='B';predC='text-info';} 
+      else if(nilaiAkhir >= 60){pred='C';predC='text-warning';} 
       else {pred='D';predC='text-danger';}
       
-      h+='<tr class="border-t border-border"><td class="p-2 font-bold">'+(i+1)+'</td><td class="p-2 font-mono text-xs">'+d.nisn+'</td><td class="p-2 font-semibold">'+d.nama+'</td><td class="p-2 text-center text-xs">'+d.rombel+'</td><td class="p-2 text-center text-info">'+(d.nilaiPG||0)+'</td><td class="p-2 text-center text-warning">'+(d.nilaiUr||0)+'</td><td class="p-2 text-center font-bold text-kopAccent">'+t+'</td><td class="p-2 text-center font-bold '+predC+'">'+pred+'</td></tr>';
+      h+='<tr class="border-t border-border"><td class="p-2 font-bold">'+(i+1)+'</td><td class="p-2 font-mono text-xs">'+d.nisn+'</td><td class="p-2 font-semibold">'+d.nama+'</td><td class="p-2 text-center text-xs">'+d.rombel+'</td><td class="p-2 text-center text-info">'+pgMentah+'</td><td class="p-2 text-center text-warning">'+urMentah+'</td><td class="p-2 text-center font-bold text-kopAccent">'+nilaiAkhir+'</td><td class="p-2 text-center font-bold '+predC+'">'+pred+'</td></tr>';
     });
+    
+    // Hitung Rata-rata berdasarkan nilaiAkhir yang baru dihitung
     var avg=docs.length?Math.round(sumTotal/docs.length):0;
     
     var predAvg='',predAvgC='';
@@ -984,24 +995,31 @@ function doCetakNilai(){
     if(!docs.length){showToast('Tidak ada nilai','warning');return}
     var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
     
-    // Tentukan pembagi untuk CETAK (sama dengan tampilan layar)
+    // Tentukan pembagi CETAK
     var pembagi = (kelas === 'Kelas 1' || kelas === 'Kelas 2') ? 35 : 60;
     
     var hh='<!DOCTYPE html><html><head><title>Cetak Nilai</title><style>@page{size:A4 portrait;margin:1.8cm 1.5cm}body{margin:0;padding:0;font-family:"Times New Roman",serif;font-size:11pt;line-height:1.5;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}.kop{text-align:center;padding-bottom:12px;margin-bottom:16px;border-bottom:3px double #000}.kop h1{font-size:13pt;font-weight:bold;text-transform:uppercase;margin:0;letter-spacing:1px}.kop h2{font-size:15pt;font-weight:bold;text-transform:uppercase;margin:4px 0 0;letter-spacing:2px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:6px 8pt;font-size:10.5pt}th{background:#f0f0f0;font-weight:bold;text-align:center}.text-center{text-align:center}.text-right{text-align:right}.font-bold{font-weight:bold}</style></head><body><div class="kop"><h1>Pemerintah Kabupaten Majalengka</h1><h1>Dinas Pendidikan</h1><h2>REKAPITULASI NILAI</h2></div><div style="text-align:center;margin-bottom:20px"><h3 style="font-size:13pt;font-weight:bold;text-decoration:underline;text-transform:uppercase;margin:0 0 4px">Sumatif Akhir Tahun (SAT)</h3><p style="font-size:11pt;margin:0">'+mn+'</p><p style="font-size:11pt;margin:0">'+gData.sekolah+' &mdash; '+kelas+' Rombel '+(rombel||'Semua')+'</p></div><table><thead><tr><th style="width:5%">No</th><th style="width:18%">NISN</th><th style="width:22%">Nama Siswa</th><th style="width:10%">Rombel</th><th style="width:10%">Nilai PG</th><th style="width:10%">Nilai Uraian</th><th style="width:13%">Total</th><th style="width:12%">Predikat</th></tr></thead><tbody>';
+    
     var sumTotal=0;
     docs.forEach(function(d,i){
-      var t=d.nilaiTotal||0;
-      sumTotal+=t;
+      // --- RE-CALCULATE NILAI AKHIR CETAK ---
+      var pgMentah = d.nilaiPG || 0;
+      var urMentah = d.nilaiUr || 0;
+      var totalPoin = pgMentah + urMentah;
+      var nilaiAkhir = Math.min(100, Math.round((totalPoin / pembagi) * 100));
+      // -------------------------------------------
+
+      sumTotal += nilaiAkhir;
       
-      // LOGIKA PREDIKAT CETAK (Sama)
       var pred='';
-      if(t >= 80) pred='A';
-      else if(t >= 70) pred='B';
-      else if(t >= 60) pred='C';
+      if(nilaiAkhir >= 80) pred='A';
+      else if(nilaiAkhir >= 70) pred='B';
+      else if(nilaiAkhir >= 60) pred='C';
       else pred='D';
 
-      hh+='<tr><td class="text-center">'+(i+1)+'</td><td>'+d.nisn+'</td><td>'+d.nama+'</td><td class="text-center">'+d.rombel+'</td><td class="text-center">'+(d.nilaiPG||0)+'</td><td class="text-center">'+(d.nilaiUr||0)+'</td><td class="text-center font-bold">'+t+'</td><td class="text-center font-bold">'+pred+'</td></tr>';
+      hh+='<tr><td class="text-center">'+(i+1)+'</td><td>'+d.nisn+'</td><td>'+d.nama+'</td><td class="text-center">'+d.rombel+'</td><td class="text-center">'+pgMentah+'</td><td class="text-center">'+urMentah+'</td><td class="text-center font-bold">'+nilaiAkhir+'</td><td class="text-center font-bold">'+pred+'</td></tr>';
     });
+    
     var avg=docs.length?Math.round(sumTotal/docs.length):0;
     
     var predAvg='';
