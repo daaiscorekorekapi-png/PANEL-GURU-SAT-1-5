@@ -902,8 +902,7 @@ function uAkhir(){var pg=0,ur=0;var pEl=document.getElementById('totalPG');var u
 function resetSkor(){for(var i=0;i<100;i++){var el=document.getElementById('jawabPG'+i);if(el)el.value='';var sEl=document.getElementById('skorPG'+i);if(sEl){sEl.textContent='0';sEl.className='font-bold text-muted'}var uEl=document.getElementById('skorUr'+i);if(uEl)uEl.value='0'}var tEl=document.getElementById('totalUr');if(tEl)tEl.textContent='0';uTPG();uAkhir();showToast('Skor direset')}
 
 /* ====================================================================
-   KOREKSI NILAI (REKAP MANUAL OTOMATIS TARIK DATA SISWA)
-   ==================================================================== */
+   /* === KOREKSI NILAI (REKAP MANUAL OTOMATIS TARIK DATA SISWA) === */
 function rKoreksi(c){
   var h='<div class="fade-in space-y-4">';
   
@@ -955,6 +954,7 @@ function rKoreksi(c){
   // Load awal dropdown siswa
   loadSiswaDropdown();
 }
+
 // --- FUNGSI PENDUKUNG UNTUK DROPDOWN SISWA ---
 function loadSiswaDropdown() {
   var kelas = document.getElementById('krK').value || activeClass;
@@ -997,7 +997,8 @@ function autoIsiSiswa() {
     inpNisn.value = '';
   }
 }
-  /* === LOAD DATA KOREKSI (DENGAN TOMBOL EDIT JAWABAN) === */
+
+/* === LOAD DATA KOREKSI (DAFTAR NILAI) === */
 function loadKoreksiData(){
   var mapel=document.getElementById('krM').value,kelas=document.getElementById('krK').value||activeClass,rombel=document.getElementById('krR').value;
   var container=document.getElementById('koreksi_container');var modeContainer=document.getElementById('koreksi_mode_container');
@@ -1035,6 +1036,7 @@ function loadKoreksiData(){
     container.innerHTML=h;
   }).catch(function(e){container.innerHTML='<div class="card text-center py-8 text-danger">Gagal memuat data nilai.</div>'});
 }
+
 function hapusJawabanSiswa(nisn, mapel, kelas, rombel, docId) {
   if(!confirm('Apakah Anda yakin ingin MENGHAPUS TOTAL data ujian siswa ini?\n\nData jawaban dan nilai akan dihilangkan sepenuhnya dari sistem sehingga siswa dapat login dan mengerjakan ujian kembali dari awal.')) return;
   var db = getDB(kelas); 
@@ -1045,6 +1047,82 @@ function hapusJawabanSiswa(nisn, mapel, kelas, rombel, docId) {
   }).catch(function(e){
     showToast('Gagal menghapus data: ' + e.message, 'error');
   });
+}
+
+function kembaliKeDaftar(){var modeContainer=document.getElementById('koreksi_mode_container');var listContainer=document.getElementById('koreksi_container');modeContainer.classList.add('hidden');modeContainer.innerHTML='';listContainer.style.display='block';loadKoreksiData()}
+
+/* === FUNGSI SIMPAN REKAP MANUAL (FIXED) === */
+function simpanManualRekap() {
+  // 1. Ambil data dari Dropdown (Untuk ID Siswa) dan Input Nilai
+  var siswaSelect = document.getElementById('rmSiswa');
+  var siswaId = siswaSelect.value;
+  
+  // Jika belum pilih siswa di dropdown
+  if(!siswaId || siswaId === "") {
+    showToast('Harap pilih siswa dari dropdown terlebih dahulu!', 'error');
+    return;
+  }
+
+  var nama = document.getElementById('rmNama').value.trim();
+  var nisn = document.getElementById('rmNISN').value.trim();
+  var pg = parseInt(document.getElementById('rmPG').value) || 0;
+  var ur = parseInt(document.getElementById('rmUr').value) || 0;
+  var mapel = document.getElementById('krM').value;
+  var kelas = document.getElementById('krK').value || activeClass;
+  var rombel = document.getElementById('krR').value;
+
+  if(!mapel){ showToast('Pilih Mapel terlebih dahulu','error'); return; }
+  if(pg < 0 || pg > 30){ showToast('Nilai PG harus 0-30','error'); return; }
+  if(ur < 0 || ur > 30){ showToast('Nilai Uraian harus 0-30','error'); return; }
+
+  var total = Math.min(100, Math.round(((pg+ur)/60)*100));
+  var db = getDB(kelas);
+  if(!db){ showToast('Database Error','error'); return; }
+
+  // Cek apakah sudah ada nilai untuk siswa ini di mapel ini (Berdasarkan NISN)
+  db.collection('nilai').where('nisn','==',nisn).where('mapel','==',mapel).limit(1).get().then(function(snap){
+    if(!snap.empty){
+      // Jika sudah ada -> UPDATE
+      var docId = snap.docs[0].id;
+      db.collection('nilai').doc(docId).update({
+        nama: nama,
+        nisn: nisn,
+        nilaiPG: pg,
+        nilaiUr: ur,
+        nilaiTotal: total,
+        rombel: rombel,
+        submittedBy: 'manual_guru',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(function(){
+        showToast('Nilai berhasil diperbarui!');
+        // Reset form tapi biarkan filter tetap
+        document.getElementById('rmPG').value='';
+        document.getElementById('rmUr').value='';
+        loadKoreksiData(); // Refresh tabel
+      }).catch(function(e){ showToast('Gagal update: '+e.message,'error'); });
+    } else {
+      // Jika belum ada -> ADD BARU
+      db.collection('nilai').add({
+        nama: nama,
+        nisn: nisn,
+        mapel: mapel,
+        kelas: kelas,
+        rombel: rombel,
+        nilaiPG: pg,
+        nilaiUr: ur,
+        nilaiTotal: total,
+        submittedBy: 'manual_guru',
+        npsn: getGuruNPSN(),
+        guruNip: gData.nip,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(function(){
+        showToast('Nilai berhasil ditambahkan!');
+        document.getElementById('rmPG').value='';
+        document.getElementById('rmUr').value='';
+        loadKoreksiData(); // Refresh tabel
+      }).catch(function(e){ showToast('Gagal simpan: '+e.message,'error'); });
+    }
+  }).catch(function(e){ showToast('Gagal cek data: '+e.message,'error'); });
 }
 
 function kembaliKeDaftar(){var modeContainer=document.getElementById('koreksi_mode_container');var listContainer=document.getElementById('koreksi_container');modeContainer.classList.add('hidden');modeContainer.innerHTML='';listContainer.style.display='block';loadKoreksiData()}
