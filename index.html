@@ -902,34 +902,47 @@ function uAkhir(){var pg=0,ur=0;var pEl=document.getElementById('totalPG');var u
 function resetSkor(){for(var i=0;i<100;i++){var el=document.getElementById('jawabPG'+i);if(el)el.value='';var sEl=document.getElementById('skorPG'+i);if(sEl){sEl.textContent='0';sEl.className='font-bold text-muted'}var uEl=document.getElementById('skorUr'+i);if(uEl)uEl.value='0'}var tEl=document.getElementById('totalUr');if(tEl)tEl.textContent='0';uTPG();uAkhir();showToast('Skor direset')}
 
 /* ====================================================================
-   KOREKSI NILAI (DENGAN INPUT MANUAL LANGSUNG & EDIT NAMA)
+   KOREKSI NILAI (REKAP MANUAL OTOMATIS TARIK DATA SISWA)
    ==================================================================== */
 function rKoreksi(c){
   var h='<div class="fade-in space-y-4">';
   
-  // --- FILTER BAR ---
-  h+='<div class="card"><div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4"><h3 class="font-bold text-light">Koreksi Nilai &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3><div class="grid md:grid-cols-4 gap-3 w-full md:w-auto"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="krM" class="input-field" onchange="loadKoreksiData()"><option value="">-- Pilih Mapel --</option>';
+  // --- FILTER BAR (ATAS) ---
+  h+='<div class="card"><div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4"><h3 class="font-bold text-light">Koreksi Nilai &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3><div class="grid md:grid-cols-4 gap-3 w-full md:w-auto"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="krM" class="input-field" onchange="loadKoreksiData(); loadSiswaDropdown()"><option value="">-- Pilih Mapel --</option>';
   MAPEL_LIST.forEach(function(m){h+='<option value="'+m.id+'">'+m.nama+'</option>'});
-  h+='</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="krK" class="input-field" onchange="switchDB(this.value); loadKoreksiData()"><option value="">Semua</option>';
+  h+='</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="krK" class="input-field" onchange="switchDB(this.value); loadKoreksiData(); loadSiswaDropdown()"><option value="">Semua</option>';
   getGuruKelas().forEach(function(k){h+='<option value="'+k+'"'+(k===activeClass?' selected':'')+'>'+k+'</option>'});
-  h+='</select></div><div><label class="text-xs text-muted block mb-1">Rombel</label><select id="krR" class="input-field" onchange="loadKoreksiData()"><option value="">Semua</option>';
+  h+='</select></div><div><label class="text-xs text-muted block mb-1">Rombel</label><select id="krR" class="input-field" onchange="loadKoreksiData(); loadSiswaDropdown()"><option value="">Semua</option>';
   getGuruRombel().forEach(function(r){h+='<option value="'+r+'">Rombel '+r+'</option>'});
   h+='</select></div><div class="flex items-end"><button onclick="loadKoreksiData()" class="btn-primary text-sm w-full"><i class="fas fa-search mr-2"></i>Tampilkan</button></div></div></div>';
 
-  // --- MANUAL INPUT FORM (Khusus Kelas 1, 2, 3) ---
+  // --- MANUAL INPUT FORM (DENGAN DROPDOWN SISWA) ---
   h+='<div class="card bg-kopAccent/10 border-kopAccent/40">';
   h+='<div class="flex items-center justify-between mb-3">';
   h+='<h4 class="font-bold text-kopAccent text-sm"><i class="fas fa-edit mr-2"></i>Input Rekap Manual (Ujian Kertas)</h4>';
-  h+='<span class="text-[10px] text-kopAccent bg-kopAccent/20 px-2 py-0.5 rounded font-bold uppercase">Khusus Kelas 1-3</span>';
+  h+='<span class="text-[10px] text-kopAccent bg-kopAccent/20 px-2 py-0.5 rounded font-bold uppercase">Pilih Siswa Dari Dropdown</span>';
   h+='</div>';
+  
   h+='<div class="grid grid-cols-2 md:grid-cols-12 gap-3 items-end">';
-  h+='<div class="md:col-span-3"><label class="text-xs text-muted block mb-1">Nama Siswa</label><input type="text" id="rmNama" class="input-field text-sm" placeholder="Nama Lengkap"></div>';
-  h+='<div class="md:col-span-3"><label class="text-xs text-muted block mb-1">NISN</label><input type="text" id="rmNISN" class="input-field text-sm" placeholder="Nomor Induk"></div>';
-  h+='<div class="md:col-span-2"><label class="text-xs text-muted block mb-1">Nilai PG (0-30)</label><input type="number" id="rmPG" class="input-field text-sm text-center font-bold" placeholder="0" min="0" max="30"></div>';
-  h+='<div class="md:col-span-2"><label class="text-xs text-muted block mb-1">Nilai Uraian (0-30)</label><input type="number" id="rmUr" class="input-field text-sm text-center font-bold" placeholder="0" min="0" max="30"></div>';
-  h+='<div class="md:col-span-2"><button onclick="simpanManualRekap()" class="btn-primary w-full text-sm py-2 h-[38px]"><i class="fas fa-save mr-1"></i>Simpan</button></div>';
+  
+  // 1. Dropdown Pilih Siswa
+  h+='<div class="md:col-span-4"><label class="text-xs text-muted block mb-1">Pilih Siswa</label><select id="rmSiswa" class="input-field text-sm" onchange="autoIsiSiswa()"><option value="">-- Cari Nama Siswa --</option></select></div>';
+  
+  // 2. Nama (Readonly)
+  h+='<div class="md:col-span-3"><label class="text-xs text-muted block mb-1">Nama Siswa</label><input type="text" id="rmNama" class="input-field text-sm bg-dark/80 text-muted" placeholder="Otomatis terisi..." readonly style="cursor:not-allowed"></div>';
+  
+  // 3. NISN (Readonly)
+  h+='<div class="md:col-span-2"><label class="text-xs text-muted block mb-1">NISN</label><input type="text" id="rmNISN" class="input-field text-sm bg-dark/80 text-muted" placeholder="..." readonly style="cursor:not-allowed"></div>';
+  
+  // 4. Input Nilai
+  h+='<div class="md:col-span-1"><label class="text-xs text-muted block mb-1">Nilai PG</label><input type="number" id="rmPG" class="input-field text-sm text-center font-bold" placeholder="0" min="0" max="30"></div>';
+  h+='<div class="md:col-span-1"><label class="text-xs text-muted block mb-1">Nilai Ur</label><input type="number" id="rmUr" class="input-field text-sm text-center font-bold" placeholder="0" min="0" max="30"></div>';
+  
+  // 5. Tombol Simpan
+  h+='<div class="md:col-span-1"><button onclick="simpanManualRekap()" class="btn-primary w-full text-sm py-2 h-[38px]"><i class="fas fa-save mr-1"></i>Simpan</button></div>';
+  
   h+='</div>';
-  h+='<div class="text-[10px] text-muted mt-2"><i class="fas fa-info-circle mr-1"></i>Masukkan nilai manual untuk siswa yang ujian menggunakan kertas/LJK.</div>';
+  h+='<div class="text-[10px] text-muted mt-2"><i class="fas fa-info-circle mr-1"></i>Pilih siswa di dropdown, nilai akan otomatis terikat ke data siswa tersebut.</div>';
   h+='</div>';
 
   // --- SISWA LIST CONTAINER ---
@@ -938,9 +951,53 @@ function rKoreksi(c){
   h+='</div>';
   
   c.innerHTML=h;
+  
+  // Load awal dropdown siswa
+  loadSiswaDropdown();
+}
+// --- FUNGSI PENDUKUNG UNTUK DROPDOWN SISWA ---
+function loadSiswaDropdown() {
+  var kelas = document.getElementById('krK').value || activeClass;
+  var rombel = document.getElementById('krR').value;
+  var sel = document.getElementById('rmSiswa');
+  if(!sel) return;
+  
+  sel.innerHTML = '<option value="">-- Cari Nama Siswa --</option>';
+  
+  if(!rombel) {
+    var opt = document.createElement('option');
+    opt.text = "Pilih Rombel dulu...";
+    sel.add(opt);
+    return;
+  }
+
+  fetchSiswaRombel(kelas, rombel).then(function(docs){
+    docs.forEach(function(d){
+      var opt = document.createElement('option');
+      opt.value = d._id;
+      opt.text = d.nama + ' (' + d.nisn + ')';
+      opt.setAttribute('data-nama', d.nama);
+      opt.setAttribute('data-nisn', d.nisn);
+      sel.add(opt);
+    });
+  }).catch(function(e){ console.log(e); });
 }
 
-/* === LOAD DATA KOREKSI (DENGAN TOMBOL EDIT JAWABAN) === */
+function autoIsiSiswa() {
+  var sel = document.getElementById('rmSiswa');
+  var inpNama = document.getElementById('rmNama');
+  var inpNisn = document.getElementById('rmNISN');
+  
+  if(sel.selectedIndex > 0) {
+    var opt = sel.options[sel.selectedIndex];
+    inpNama.value = opt.getAttribute('data-nama');
+    inpNisn.value = opt.getAttribute('data-nisn');
+  } else {
+    inpNama.value = '';
+    inpNisn.value = '';
+  }
+}
+  /* === LOAD DATA KOREKSI (DENGAN TOMBOL EDIT JAWABAN) === */
 function loadKoreksiData(){
   var mapel=document.getElementById('krM').value,kelas=document.getElementById('krK').value||activeClass,rombel=document.getElementById('krR').value;
   var container=document.getElementById('koreksi_container');var modeContainer=document.getElementById('koreksi_mode_container');
