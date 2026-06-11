@@ -1170,10 +1170,97 @@ function simpanKoreksiDetail(nisn, mapel, kelas, rombel, docId) {
   }).catch(function(e){ showToast('Gagal menyimpan: '+e.message, 'error'); if(btn){ btn.disabled = false; btn.innerHTML = ori; } });
 }
 
-/* === CETAK NILAI === */
+/* === CETAK NILAI (FIXED PREDIKAT) === */
 function rCetakNilai(c){var h='<div class="fade-in no-print space-y-4"><div class="card"><h3 class="font-bold text-light mb-4">Cetak Nilai &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3><div class="grid md:grid-cols-4 gap-4 mb-4"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="cnM" class="input-field" onchange="loadCetakNilai()"><option value="">-- Pilih --</option>';MAPEL_LIST.forEach(function(m){h+='<option value="'+m.id+'">'+m.nama+'</option>'});h+='</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="cnK" class="input-field" onchange="switchDB(this.value); loadCetakNilai()"><option value="">Semua</option>';getGuruKelas().forEach(function(k){h+='<option value="'+k+'"'+(k===activeClass?' selected':'')+'>'+k+'</option>'});h+='</select></div><div><label class="text-xs text-muted block mb-1">Rombel</label><select id="cnR" class="input-field" onchange="loadCetakNilai()"><option value="">Semua</option>';getGuruRombel().forEach(function(r){h+='<option value="'+r+'">Rombel '+r+'</option>'});h+='</select></div><div class="flex items-end gap-2"><button onclick="loadCetakNilai()" class="btn-primary text-sm flex-1"><i class="fas fa-search mr-2"></i>Tampilkan</button><button onclick="doCetakNilai()" class="btn-secondary text-sm"><i class="fas fa-print mr-2"></i>Cetak</button></div></div></div><div id="cnBox"></div></div>';c.innerHTML=h}
-function loadCetakNilai(){var mapel=document.getElementById('cnM').value,kelas=document.getElementById('cnK').value||activeClass,rombel=document.getElementById('cnR').value;if(!mapel){document.getElementById('cnBox').innerHTML='';return}var box=document.getElementById('cnBox');box.innerHTML='<p class="text-muted text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i></p>';fetchNilai(mapel,kelas,rombel).then(function(docs){if(!docs.length){box.innerHTML='<div class="card text-center py-8"><p class="text-muted">Belum ada nilai tersimpan.</p></div>';return}var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;var h='<div class="card"><div class="flex justify-between items-center mb-4"><h4 class="font-bold text-light">'+mn+' &mdash; '+kelas+(rombel?' Rombel '+rombel:'')+'</h4><span class="text-xs text-muted">'+docs.length+' siswa</span></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">NISN</th><th class="p-2 text-left">Nama</th><th class="p-2 text-center">Rombel</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center font-bold">Total</th><th class="p-2 text-center">Predikat</th></tr></thead><tbody>';var sumTotal=0;docs.forEach(function(d,i){var t=d.nilaiTotal||0;sumTotal+=t;var pred=t>=90?'A':t>=80?'B':t>=70?'C':t>=60?'D':'E',predC=t>=90?'text-success':t>=70?'text-info':t>=60?'text-warning':'text-danger';h+='<tr class="border-t border-border"><td class="p-2 font-bold">'+(i+1)+'</td><td class="p-2 font-mono text-xs">'+d.nisn+'</td><td class="p-2 font-semibold">'+d.nama+'</td><td class="p-2 text-center text-xs">'+d.rombel+'</td><td class="p-2 text-center text-info">'+(d.nilaiPG||0)+'</td><td class="p-2 text-center text-warning">'+(d.nilaiUr||0)+'</td><td class="p-2 text-center font-bold text-kopAccent">'+t+'</td><td class="p-2 text-center font-bold '+predC+'">'+pred+'</td></tr>'});var avg=docs.length?Math.round(sumTotal/docs.length):0;h+='<tr class="border-t-2 border-kopAccent"><td class="p-2" colspan="6" style="text-align:right;font-weight:bold">Rata-rata</td><td class="p-2 text-center font-black text-lg text-kopAccent">'+avg+'</td><td class="p-2 text-center font-bold">'+(avg>=90?'A':avg>=80?'B':avg>=70?'C':avg>=60?'D':'E')+'</td></tr>';h+='</tbody></table></div></div>';box.innerHTML=h})}
-function doCetakNilai(){var mapel=document.getElementById('cnM').value,kelas=document.getElementById('cnK').value||activeClass,rombel=document.getElementById('cnR').value;if(!mapel){showToast('Pilih Mapel','error');return}fetchNilai(mapel,kelas,rombel).then(function(docs){if(!docs.length){showToast('Tidak ada nilai','warning');return}var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;var hh='<!DOCTYPE html><html><head><title>Cetak Nilai</title><style>@page{size:A4 portrait;margin:1.8cm 1.5cm}body{margin:0;padding:0;font-family:"Times New Roman",serif;font-size:11pt;line-height:1.5;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}.kop{text-align:center;padding-bottom:12px;margin-bottom:16px;border-bottom:3px double #000}.kop h1{font-size:13pt;font-weight:bold;text-transform:uppercase;margin:0;letter-spacing:1px}.kop h2{font-size:15pt;font-weight:bold;text-transform:uppercase;margin:4px 0 0;letter-spacing:2px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:6px 8pt;font-size:10.5pt}th{background:#f0f0f0;font-weight:bold;text-align:center}.text-center{text-align:center}.text-right{text-align:right}.font-bold{font-weight:bold}</style></head><body><div class="kop"><h1>Pemerintah Kabupaten Majalengka</h1><h1>Dinas Pendidikan</h1><h2>REKAPITULASI NILAI</h2></div><div style="text-align:center;margin-bottom:20px"><h3 style="font-size:13pt;font-weight:bold;text-decoration:underline;text-transform:uppercase;margin:0 0 4px">Sumatif Akhir Tahun (SAT)</h3><p style="font-size:11pt;margin:0">'+mn+'</p><p style="font-size:11pt;margin:0">'+gData.sekolah+' &mdash; '+kelas+' Rombel '+(rombel||'Semua')+'</p></div><table><thead><tr><th style="width:5%">No</th><th style="width:18%">NISN</th><th style="width:22%">Nama Siswa</th><th style="width:10%">Rombel</th><th style="width:10%">Nilai PG</th><th style="width:10%">Nilai Uraian</th><th style="width:13%">Total</th><th style="width:12%">Predikat</th></tr></thead><tbody>';var sumTotal=0;docs.forEach(function(d,i){var t=d.nilaiTotal||0;sumTotal+=t;var pred=t>=90?'A':t>=80?'B':t>=70?'C':t>=60?'D':'E';hh+='<tr><td class="text-center">'+(i+1)+'</td><td>'+d.nisn+'</td><td>'+d.nama+'</td><td class="text-center">'+d.rombel+'</td><td class="text-center">'+(d.nilaiPG||0)+'</td><td class="text-center">'+(d.nilaiUr||0)+'</td><td class="text-center font-bold">'+t+'</td><td class="text-center font-bold">'+pred+'</td></tr>'});var avg=docs.length?Math.round(sumTotal/docs.length):0;hh+='<tr><td colspan="7" class="text-right font-bold">Rata-rata Kelas</td><td class="text-center font-bold" style="font-size:13pt">'+avg+'</td></tr>';hh+='</tbody></table></body></html>';printCustomFrame(hh)})}
+
+function loadCetakNilai(){
+  var mapel=document.getElementById('cnM').value,kelas=document.getElementById('cnK').value||activeClass,rombel=document.getElementById('cnR').value;
+  if(!mapel){document.getElementById('cnBox').innerHTML='';return}
+  var box=document.getElementById('cnBox');
+  box.innerHTML='<p class="text-muted text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i></p>';
+  fetchNilai(mapel,kelas,rombel).then(function(docs){
+    if(!docs.length){box.innerHTML='<div class="card text-center py-8"><p class="text-muted">Belum ada nilai tersimpan.</p></div>';return}
+    var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
+    var h='<div class="card"><div class="flex justify-between items-center mb-4"><h4 class="font-bold text-light">'+mn+' &mdash; '+kelas+(rombel?' Rombel '+rombel:'')+'</h4><span class="text-xs text-muted">'+docs.length+' siswa</span></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">NISN</th><th class="p-2 text-left">Nama</th><th class="p-2 text-center">Rombel</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center font-bold">Total</th><th class="p-2 text-center">Predikat</th></tr></thead><tbody>';
+    var sumTotal=0;
+    docs.forEach(function(d,i){
+      var t=d.nilaiTotal||0;
+      sumTotal+=t;
+      
+      // --- LOGIKA PREDIKAT BARU (FIXED) ---
+      // A: 80-100, B: 70-79, C: 60-69, D: <60
+      var pred='';
+      var predC='';
+      if(t >= 80){
+        pred='A'; predC='text-success';
+      } else if(t >= 70){
+        pred='B'; predC='text-info';
+      } else if(t >= 60){
+        pred='C'; predC='text-warning';
+      } else {
+        pred='D'; predC='text-danger';
+      }
+      // ------------------------------------
+      
+      h+='<tr class="border-t border-border"><td class="p-2 font-bold">'+(i+1)+'</td><td class="p-2 font-mono text-xs">'+d.nisn+'</td><td class="p-2 font-semibold">'+d.nama+'</td><td class="p-2 text-center text-xs">'+d.rombel+'</td><td class="p-2 text-center text-info">'+(d.nilaiPG||0)+'</td><td class="p-2 text-center text-warning">'+(d.nilaiUr||0)+'</td><td class="p-2 text-center font-bold text-kopAccent">'+t+'</td><td class="p-2 text-center font-bold '+predC+'">'+pred+'</td></tr>';
+    });
+    var avg=docs.length?Math.round(sumTotal/docs.length):0;
+    
+    // Hitung Predikat Rata-rata
+    var predAvg='';
+    var predAvgC='';
+    if(avg >= 80){
+      predAvg='A'; predAvgC='text-success';
+    } else if(avg >= 70){
+      predAvg='B'; predAvgC='text-info';
+    } else if(avg >= 60){
+      predAvg='C'; predAvgC='text-warning';
+    } else {
+      predAvg='D'; predAvgC='text-danger';
+    }
+
+    h+='<tr class="border-t-2 border-kopAccent"><td class="p-2" colspan="6" style="text-align:right;font-weight:bold">Rata-rata</td><td class="p-2 text-center font-black text-lg text-kopAccent">'+avg+'</td><td class="p-2 text-center font-bold '+predAvgC+'">'+predAvg+'</td></tr>';
+    h+='</tbody></table></div></div>';
+    box.innerHTML=h
+  })
+}
+
+function doCetakNilai(){
+  var mapel=document.getElementById('cnM').value,kelas=document.getElementById('cnK').value||activeClass,rombel=document.getElementById('cnR').value;
+  if(!mapel){showToast('Pilih Mapel','error');return}
+  fetchNilai(mapel,kelas,rombel).then(function(docs){
+    if(!docs.length){showToast('Tidak ada nilai','warning');return}
+    var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
+    var hh='<!DOCTYPE html><html><head><title>Cetak Nilai</title><style>@page{size:A4 portrait;margin:1.8cm 1.5cm}body{margin:0;padding:0;font-family:"Times New Roman",serif;font-size:11pt;line-height:1.5;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}.kop{text-align:center;padding-bottom:12px;margin-bottom:16px;border-bottom:3px double #000}.kop h1{font-size:13pt;font-weight:bold;text-transform:uppercase;margin:0;letter-spacing:1px}.kop h2{font-size:15pt;font-weight:bold;text-transform:uppercase;margin:4px 0 0;letter-spacing:2px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:6px 8pt;font-size:10.5pt}th{background:#f0f0f0;font-weight:bold;text-align:center}.text-center{text-align:center}.text-right{text-align:right}.font-bold{font-weight:bold}</style></head><body><div class="kop"><h1>Pemerintah Kabupaten Majalengka</h1><h1>Dinas Pendidikan</h1><h2>REKAPITULASI NILAI</h2></div><div style="text-align:center;margin-bottom:20px"><h3 style="font-size:13pt;font-weight:bold;text-decoration:underline;text-transform:uppercase;margin:0 0 4px">Sumatif Akhir Tahun (SAT)</h3><p style="font-size:11pt;margin:0">'+mn+'</p><p style="font-size:11pt;margin:0">'+gData.sekolah+' &mdash; '+kelas+' Rombel '+(rombel||'Semua')+'</p></div><table><thead><tr><th style="width:5%">No</th><th style="width:18%">NISN</th><th style="width:22%">Nama Siswa</th><th style="width:10%">Rombel</th><th style="width:10%">Nilai PG</th><th style="width:10%">Nilai Uraian</th><th style="width:13%">Total</th><th style="width:12%">Predikat</th></tr></thead><tbody>';
+    var sumTotal=0;
+    docs.forEach(function(d,i){
+      var t=d.nilaiTotal||0;
+      sumTotal+=t;
+      
+      // --- LOGIKA PREDIKAT BARU (FIXED PRINT) ---
+      var pred='';
+      if(t >= 80) pred='A';
+      else if(t >= 70) pred='B';
+      else if(t >= 60) pred='C';
+      else pred='D';
+      // -----------------------------------------
+
+      hh+='<tr><td class="text-center">'+(i+1)+'</td><td>'+d.nisn+'</td><td>'+d.nama+'</td><td class="text-center">'+d.rombel+'</td><td class="text-center">'+(d.nilaiPG||0)+'</td><td class="text-center">'+(d.nilaiUr||0)+'</td><td class="text-center font-bold">'+t+'</td><td class="text-center font-bold">'+pred+'</td></tr>';
+    });
+    var avg=docs.length?Math.round(sumTotal/docs.length):0;
+    
+    // Predikat Rata-rata Print
+    var predAvg='';
+    if(avg >= 80) predAvg='A';
+    else if(avg >= 70) predAvg='B';
+    else if(avg >= 60) predAvg='C';
+    else predAvg='D';
+
+    hh+='<tr><td colspan="7" class="text-right font-bold">Rata-rata Kelas</td><td class="text-center font-bold" style="font-size:13pt">'+avg+' ('+predAvg+')</td></tr>';
+    hh+='</tbody></table></body></html>';
+    printCustomFrame(hh)
+  })
+}
 
 /* === DATA SISWA === */
 function rSiswa(c){var h='<div class="fade-in space-y-4"><div class="card"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-light">Data Siswa &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3><div class="flex gap-2"><select id="siswaRombel" class="input-field text-xs py-1" onchange="reloadSiswa()">';getGuruRombel().forEach(function(r){h+='<option value="'+r+'">Rombel '+r+'</option>'});h+='</select><button onclick="openRegSiswa()" class="btn-primary text-sm"><i class="fas fa-user-plus mr-1"></i>Tambah</button></div></div><div class="flex gap-2 mb-4"><input type="text" id="cariSiswa" class="input-field text-sm" placeholder="Cari nama/NISN..." oninput="reloadSiswa()"></div><div id="siswaC" class="max-h-[65vh] overflow-y-auto pr-1"></div></div></div>';c.innerHTML=h;reloadSiswa()}
