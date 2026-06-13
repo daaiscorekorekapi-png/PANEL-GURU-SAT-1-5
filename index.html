@@ -901,58 +901,134 @@ function hSUR(i,bobot){var v=parseInt(document.getElementById('skorUr'+i).value)
 function uAkhir(){var pg=0,ur=0;var pEl=document.getElementById('totalPG');var uEl=document.getElementById('totalUr');if(pEl)pg=parseInt(pEl.textContent)||0;if(uEl)ur=parseInt(uEl.textContent)||0;var t=Math.min(100,Math.round(((pg+ur)/60)*100));var aEl=document.getElementById('totalAkhir');if(aEl)aEl.textContent=t}
 function resetSkor(){for(var i=0;i<100;i++){var el=document.getElementById('jawabPG'+i);if(el)el.value='';var sEl=document.getElementById('skorPG'+i);if(sEl){sEl.textContent='0';sEl.className='font-bold text-muted'}var uEl=document.getElementById('skorUr'+i);if(uEl)uEl.value='0'}var tEl=document.getElementById('totalUr');if(tEl)tEl.textContent='0';uTPG();uAkhir();showToast('Skor direset')}
 
+// FUNGSI HELPER: Memaksa parsing data Firebase ke dalam Object Map yang akurat
+function parseDataNilai(nilai) {
+  var pgMap = {}, urMap = {}, skMap = {};
+  
+  // PARSING PG
+  if (Array.isArray(nilai.jawabanPG)) {
+    if(nilai.soalPG_Ids && Array.isArray(nilai.soalPG_Ids) && nilai.soalPG_Ids.length === nilai.jawabanPG.length) {
+      nilai.soalPG_Ids.forEach(function(id, i){ pgMap[id] = nilai.jawabanPG[i] || ''; });
+    } else if(nilai.dataJawabanPG && Array.isArray(nilai.dataJawabanPG)) {
+      nilai.dataJawabanPG.forEach(function(d){ pgMap[d.soalId] = d.jawaban; });
+    } else {
+      // Jika murni array tanpa ID, mapping akan dilakukan nanti di mulaiKoreksiDetail via index
+    }
+  } else if (typeof nilai.jawabanPG === 'object' && nilai.jawabanPG !== null) {
+    pgMap = nilai.jawabanPG;
+  }
+
+  // PARSING URAIAN
+  if (Array.isArray(nilai.jawabanUr)) {
+    if(nilai.soalUr_Ids && Array.isArray(nilai.soalUr_Ids) && nilai.soalUr_Ids.length === nilai.jawabanUr.length) {
+      nilai.soalUr_Ids.forEach(function(id, i){ 
+        urMap[id] = nilai.jawabanUr[i] || ''; 
+        skMap[id] = parseInt(nilai.skorPerSoalUr ? (nilai.skorPerSoalUr[i] || 0) : 0); 
+      });
+    } else if(nilai.dataJawabanUr && Array.isArray(nilai.dataJawabanUr)) {
+      nilai.dataJawabanUr.forEach(function(d){ urMap[d.soalId] = d.jawaban; skMap[d.soalId] = parseInt(d.skor || 0); });
+    } else {
+      // Jika murni array tanpa ID, mapping akan dilakukan nanti di mulaiKoreksiDetail via index
+    }
+  } else if (typeof nilai.jawabanUr === 'object' && nilai.jawabanUr !== null) {
+    urMap = nilai.jawabanUr;
+    if(nilai.skorPerSoalUr && typeof nilai.skorPerSoalUr === 'object') {
+      Object.keys(nilai.skorPerSoalUr).forEach(function(k){ skMap[k] = parseInt(nilai.skorPerSoalUr[k] || 0); });
+    }
+  }
+
+  return { pgMap: pgMap, urMap: urMap, skMap: skMap };
+}
+
 /* ====================================================================
-   KOREKSI NILAI (DENGAN HAPUS JAWABAN)
+   MENU KOREKSI NILAI (FINAL VERSION - FIXED & OPTIMIZED)
    ==================================================================== */
+
+// 1. Render Halaman Utama Koreksi
 function rKoreksi(c){
-  var h='<div class="fade-in space-y-4"><div class="card"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-light">Koreksi Nilai Siswa &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3></div><div class="grid md:grid-cols-4 gap-4 mb-4"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="krM" class="input-field" onchange="loadKoreksiData()"><option value="">-- Pilih Mapel --</option>';
+  var h='<div class="fade-in space-y-4"><div class="card"><div class="flex justify-between items-center mb-4"><h3 class="font-bold text-light">Koreksi Nilai Siswa &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3></div>';
+  
+  h+='<div class="grid md:grid-cols-3 gap-4 mb-4"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="krM" class="input-field" onchange="toggleTombolTarik()"><option value="">-- Pilih Mapel --</option>';
   MAPEL_LIST.forEach(function(m){h+='<option value="'+m.id+'">'+m.nama+'</option>'});
-  h+='</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="krK" class="input-field" onchange="switchDB(this.value); loadKoreksiData()"><option value="">Semua</option>';
+  h+='</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="krK" class="input-field" onchange="switchDB(this.value)"><option value="">Semua</option>';
   getGuruKelas().forEach(function(k){h+='<option value="'+k+'"'+(k===activeClass?' selected':'')+'>'+k+'</option>'});
-  h+='</select></div><div><label class="text-xs text-muted block mb-1">Rombel</label><select id="krR" class="input-field" onchange="loadKoreksiData()"><option value="">Semua</option>';
+  h+='</select></div><div><label class="text-xs text-muted block mb-1">Rombel</label><select id="krR" class="input-field"><option value="">Semua</option>';
   getGuruRombel().forEach(function(r){h+='<option value="'+r+'">Rombel '+r+'</option>'});
-  h+='</select></div><div class="flex items-end"><button onclick="loadKoreksiData()" class="btn-primary text-sm w-full"><i class="fas fa-search mr-2"></i>Tampilkan Siswa</button></div></div></div><div id="koreksi_container"></div><div id="koreksi_mode_container" class="hidden"></div></div>';
+  h+='</select></div></div>';
+  
+  h+='<button id="btnTarikData" onclick="loadKoreksiData()" class="btn-primary w-full text-sm mb-4" disabled><i class="fas fa-download mr-2"></i>Tarik Data Nilai Siswa dari Firestore</button>';
+  
+  h+='</div><div id="koreksi_container"><div class="card text-center py-8 text-muted"><i class="fas fa-filter text-4xl mb-3 block"></i><p>Pilih Mapel lalu klik "Tarik Data Nilai Siswa".</p></div></div><div id="koreksi_mode_container" class="hidden"></div></div>';
   c.innerHTML=h;
 }
 
+function toggleTombolTarik(){
+  var mapel = document.getElementById('krM').value;
+  var btn = document.getElementById('btnTarikData');
+  if(mapel) {
+    btn.disabled = false;
+    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+  } else {
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+  }
+}
+
+// 2. Load Data Siswa ke Tabel
 function loadKoreksiData(){
   var mapel=document.getElementById('krM').value,kelas=document.getElementById('krK').value||activeClass,rombel=document.getElementById('krR').value;
   var container=document.getElementById('koreksi_container');var modeContainer=document.getElementById('koreksi_mode_container');
   modeContainer.classList.add('hidden');modeContainer.innerHTML='';container.style.display='block';
+  
   if(!mapel){container.innerHTML='<div class="card text-center py-8"><i class="fas fa-filter text-4xl text-muted mb-3"></i><p class="text-muted">Pilih Mapel terlebih dahulu untuk memuat data nilai.</p></div>';return}
+  
   container.innerHTML='<div class="card text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-kopAccent"></i><p class="mt-2 text-muted">Memuat data nilai...</p></div>';
+  
   fetchNilai(mapel,kelas,rombel).then(function(docs){
     if(!docs.length){container.innerHTML='<div class="card text-center py-8"><i class="fas fa-folder-open text-4xl text-muted mb-3"></i><p class="text-muted">Belum ada data nilai tersimpan untuk filter ini.</p></div>';return}
     var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
     var h='<div class="card"><div class="flex justify-between items-center mb-4"><h4 class="font-bold text-light">'+mn+' &mdash; '+kelas+(rombel?' Rombel '+rombel:'')+'</h4><span class="text-xs text-muted">'+docs.length+' siswa</span></div><div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="bg-dark/60"><th class="p-2 text-left w-8">No</th><th class="p-2 text-left">NISN</th><th class="p-2 text-left">Nama</th><th class="p-2 text-center">Rombel</th><th class="p-2 text-center">PG</th><th class="p-2 text-center">Uraian</th><th class="p-2 text-center font-bold">Total</th><th class="p-2 text-center w-36">Aksi</th></tr></thead><tbody>';
-    docs.forEach(function(d,i){var t=d.nilaiTotal||0;h+='<tr class="border-t border-border hover:bg-dark/30"><td class="p-2 font-bold">'+(i+1)+'</td><td class="p-2 font-mono text-xs">'+d.nisn+'</td><td class="p-2 font-semibold">'+d.nama+'</td><td class="p-2 text-center text-xs">'+d.rombel+'</td><td class="p-2 text-center text-info">'+(d.nilaiPG||0)+'</td><td class="p-2 text-center text-warning">'+(d.nilaiUr||0)+'</td><td class="p-2 text-center font-bold text-kopAccent">'+t+'</td><td class="p-2 text-center flex gap-1 justify-center"><button onclick="mulaiKoreksiDetail(\''+d.nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+d.rombel+'\',\''+d._id+'\')" class="btn-primary text-xs py-1 px-2"><i class="fas fa-pen mr-1"></i>Koreksi</button><button onclick="hapusJawabanSiswa(\''+d.nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+d.rombel+'\',\''+d._id+'\')" class="btn-danger text-xs py-1 px-2"><i class="fas fa-trash mr-1"></i>Hapus</button></td></tr>'});
+    
+    docs.forEach(function(d,i){
+      var t=d.nilaiTotal||0;
+      // FIX: Menggunakan \' agar tombol bisa diklik tanpa error
+      h+='<tr class="border-t border-border hover:bg-dark/30"><td class="p-2 font-bold">'+(i+1)+'</td><td class="p-2 font-mono text-xs">'+d.nisn+'</td><td class="p-2 font-semibold">'+d.nama+'</td><td class="p-2 text-center text-xs">'+d.rombel+'</td><td class="p-2 text-center text-info">'+(d.nilaiPG||0)+'</td><td class="p-2 text-center text-warning">'+(d.nilaiUr||0)+'</td><td class="p-2 text-center font-bold text-kopAccent">'+t+'</td><td class="p-2 text-center flex gap-1 justify-center"><button onclick="mulaiKoreksiDetail(\''+d.nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+d.rombel+'\',\''+d._id+'\')" class="btn-primary text-xs py-1 px-2"><i class="fas fa-pen mr-1"></i>Koreksi</button><button onclick="hapusJawabanSiswa(\''+d.nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+d.rombel+'\',\''+d._id+'\')" class="btn-danger text-xs py-1 px-2"><i class="fas fa-trash mr-1"></i>Hapus</button></td></tr>';
+    });
+    
     h+='</tbody></table></div></div>';container.innerHTML=h;
   }).catch(function(e){container.innerHTML='<div class="card text-center py-8 text-danger">Gagal memuat data nilai.</div>'});
 }
 
+// 3. Hapus Data Siswa (Reset Ujian)
 function hapusJawabanSiswa(nisn, mapel, kelas, rombel, docId) {
-  if(!confirm('Apakah Anda yakin ingin MENGHAPUS TOTAL data ujian siswa ini?\n\nData jawaban dan nilai akan dihilangkan sepenuhnya dari sistem sehingga siswa dapat login dan mengerjakan ujian kembali dari awal.')) return;
+  if(!confirm('PERINGATAN: Data ujian siswa ini akan DIHAPUS TOTAL.\nSiswa harus login kembali dan mengerjakan dari awal.\n\nYakin hapus?')) return;
   var db = getDB(kelas); 
   if(!db){ showToast('DB Error','error'); return; }
   db.collection('nilai').doc(docId).delete().then(function(){
-    showToast('Data ujian siswa berhasil dihapus total! Siswa dapat login kembali.', 'success');
+    showToast('Data berhasil dihapus. Siswa bisa ujian lagi.', 'success');
     loadKoreksiData();
   }).catch(function(e){
-    showToast('Gagal menghapus data: ' + e.message, 'error');
+    showToast('Gagal menghapus: ' + e.message, 'error');
   });
 }
 
-function kembaliKeDaftar(){var modeContainer=document.getElementById('koreksi_mode_container');var listContainer=document.getElementById('koreksi_container');modeContainer.classList.add('hidden');modeContainer.innerHTML='';listContainer.style.display='block';loadKoreksiData()}
+function kembaliKeDaftar(){
+  var modeContainer=document.getElementById('koreksi_mode_container');
+  var listContainer=document.getElementById('koreksi_container');
+  modeContainer.classList.add('hidden');
+  modeContainer.innerHTML='';
+  listContainer.style.display='block';
+  loadKoreksiData();
+}
 
-/* ====================================================================
-   KOREKSI NILAI (FIXED GEPCLOK: MAPPING ABSOLUT BERDASARKAN ID SOAL)
-   ==================================================================== */
-
+// 4. Load Detail Koreksi
 function mulaiKoreksiDetail(nisn, mapel, kelas, rombel, docId) {
   var container=document.getElementById('koreksi_mode_container');var listContainer=document.getElementById('koreksi_container');
   listContainer.style.display='none';container.classList.remove('hidden');
-  container.innerHTML='<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-kopAccent"></i><p class="mt-2 text-muted">Mendeteksi urutan soal & menghitung skor...</p></div>';
-  var db=getDB(kelas);if(!db){showToast('DB Error','error');return}
+  container.innerHTML='<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-2xl text-kopAccent"></i><p class="mt-2 text-muted">Memuat detail jawaban...</p></div>';
+  
+  var db=getDB(kelas);
+  if(!db){showToast('DB Error','error');kembaliKeDaftar();return}
   
   var soalQuery = db.collection('questions');
   if(mapel) soalQuery = soalQuery.where('mapel','==',mapel);
@@ -964,9 +1040,13 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel, docId) {
     
     var soalDocs = [];
     soalSnap.forEach(function(doc){ var d = doc.data(); d._docId = doc.id; soalDocs.push(d); });
-    
     var filteredSoal = soalDocs.filter(function(q){ return q.kelas === kelas; });
-    filteredSoal = sByT(filteredSoal, false); 
+    
+    filteredSoal.sort(function(a, b) {
+      var noA = parseInt(a.no) || 0;
+      var noB = parseInt(b.no) || 0;
+      return noA > noB ? 1 : (noA < noB ? -1 : 0);
+    });
     
     var listPG=[], listUR=[];
     filteredSoal.forEach(function(q){ if(q.type==='pg') listPG.push(q); else listUR.push(q); });
@@ -974,224 +1054,244 @@ function mulaiKoreksiDetail(nisn, mapel, kelas, rombel, docId) {
     var bobotPG=1, bobotUr=3;
     var mn=(MAPEL_LIST.find(function(m){return m.id===mapel})||{}).nama||mapel;
 
-    /* === PERBAIKAN UTAMA: BACA JAWABAN BERDASARKAN ID SOAL (TIDAK PKAI INDEX) === */
-    
-    // 1. Buat Peta (Map) Jawaban PG Siswa: { "ID_SOAL": "JAWABAN" }
-    var jawabanPGMap = {};
-    var rawJawabanPG = nilai.jawabanPG || [];
-    var rawSoalPGIds = nilai.soalPG_Ids || [];
-    
-    if (typeof rawJawabanPG === 'object' && !Array.isArray(rawJawabanPG)) {
-      // Jika format sudah berupa Object Map
-      jawabanPGMap = rawJawabanPG;
-    } else if (Array.isArray(rawJawabanPG) && rawSoalPGIds.length > 0) {
-      // Jika format masih Array, konversi ke Map berdasarkan ID
-      rawSoalPGIds.forEach(function(id, i) {
-        if(id) jawabanPGMap[id] = rawJawabanPG[i] || '';
-      });
-    } else if (Array.isArray(rawJawabanPG)) {
-      // Fallback: Jika tidak ada ID sama sekali (data lama), gunakan index urutan soal saat ini
-      listPG.forEach(function(q, i) {
-        var qId = q._docId; 
-        jawabanPGMap[qId] = rawJawabanPG[i] || '';
+    // PARSING DATA TANGGUH
+    var parsed = parseDataNilai(nilai);
+    var jawabanPGMap = parsed.pgMap;
+    var jawabanUrMap = parsed.urMap;
+    var skorUrMap = parsed.skMap;
+
+    // FALLBACK: Jika PG murni Array tanpa ID, paksa mapping berdasarkan index urutan soal
+    if(Object.keys(jawabanPGMap).length === 0 && Array.isArray(nilai.jawabanPG)) {
+      listPG.forEach(function(q, i){ jawabanPGMap[q._docId] = nilai.jawabanPG[i] || ''; });
+    }
+    // FALLBACK: Jika UR murni Array tanpa ID
+    if(Object.keys(jawabanUrMap).length === 0 && Array.isArray(nilai.jawabanUr)) {
+      listUR.forEach(function(q, i){ 
+        jawabanUrMap[q._docId] = nilai.jawabanUr[i] || ''; 
+        skorUrMap[q._docId] = parseInt(nilai.skorPerSoalUr ? (nilai.skorPerSoalUr[i] || 0) : 0); 
       });
     }
 
-    // 2. Buat Peta Jawaban & Skor Uraian Siswa: { "ID_SOAL": "JAWABAN" }
-    var jawabanUrMap = {};
-    var skorUrMap = {};
-    var rawJawabanUr = nilai.jawabanUr || [];
-    var rawSkorUr = nilai.skorPerSoalUr || [];
-    var rawSoalUrIds = nilai.soalUr_Ids || [];
-
-    if (typeof rawJawabanUr === 'object' && !Array.isArray(rawJawabanUr)) {
-      jawabanUrMap = rawJawabanUr;
-      skorUrMap = rawSkorUr;
-    } else if (Array.isArray(rawJawabanUr) && rawSoalUrIds.length > 0) {
-      rawSoalUrIds.forEach(function(id, i) {
-        if(id) {
-          jawabanUrMap[id] = rawJawabanUr[i] || '';
-          skorUrMap[id] = rawSkorUr[i] || 0;
-        }
-      });
-    } else if (Array.isArray(rawJawabanUr)) {
-      listUR.forEach(function(q, i) {
-        var qId = q._docId;
-        jawabanUrMap[qId] = rawJawabanUr[i] || '';
-        skorUrMap[qId] = rawSkorUr[i] || 0;
-      });
-    }
-
-    // 3. Hitung Skor Otomatis dengan Memetakan dari Map di atas
     var autoSkorPG=0, pgBenar=0, pgSalah=0;
     listPG.forEach(function(q){
-      var qId = q._docId; 
-      var jawabSiswa = jawabanPGMap[qId] || ''; 
-      var kunci = q.answer || ''; 
-      if(jawabSiswa && jawabSiswa.toUpperCase() === kunci.toUpperCase()){ autoSkorPG += bobotPG; pgBenar++; } 
-      else if(jawabSiswa && jawabSiswa !== ''){ pgSalah++; }
+      var j = (jawabanPGMap[q._docId]||'').toUpperCase();
+      var k = (q.answer||'').toUpperCase();
+      if(j && j === k){ autoSkorPG += bobotPG; pgBenar++; } 
+      else if(j && j !== ''){ pgSalah++; }
     });
     if(autoSkorPG > 30) autoSkorPG = 30;
 
     var autoSkorUr=0;
-    listUR.forEach(function(q){ 
-      var qId = q._docId;
-      autoSkorUr += parseInt(skorUrMap[qId] || 0); 
-    });
+    listUR.forEach(function(q){ autoSkorUr += parseInt(skorUrMap[q._docId] || 0); });
     if(autoSkorUr > 30) autoSkorUr = 30;
 
     var totalAwal = Math.min(100, Math.round(((autoSkorPG + autoSkorUr) / 60) * 100));
 
-    // --- RENDER UI ---
-    var h='<div class="card"><div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b border-border gap-4"><div><h3 class="text-xl font-bold text-kopAccent"><i class="fas fa-check-double mr-2"></i>Lembar Koreksi Detail</h3><div class="text-sm text-muted mt-1">Siswa: <b class="text-light">'+nilai.nama+'</b> ('+nilai.nisn+') <span class="mx-2">|</span> '+mn+' <span class="mx-2">|</span> '+kelas+' '+rombel+'</div></div><div class="flex flex-wrap items-center gap-2"><button onclick="simpanKoreksiDetail(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\',\''+docId+'\')" class="btn-primary shadow-lg"><i class="fas fa-save mr-2"></i>SIMPAN PERUBAHAN</button><button onclick="hapusJawabanSiswa(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\',\''+docId+'\')" class="btn-danger shadow-lg"><i class="fas fa-trash mr-2"></i>HAPUS JAWABAN</button><button onclick="kembaliKeDaftar()" class="btn-secondary text-muted hover:text-light"><i class="fas fa-arrow-left mr-1"></i>Kembali</button></div></div>';
+    var h='<div class="card"><div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 pb-4 border-b border-border gap-4"><div><h3 class="text-xl font-bold text-kopAccent"><i class="fas fa-check-double mr-2"></i>Koreksi Jawaban</h3><div class="text-sm text-muted mt-1">Siswa: <b class="text-light">'+nilai.nama+'</b> ('+nilai.nisn+') <span class="mx-2">|</span> '+mn+' <span class="mx-2">|</span> '+kelas+' '+rombel+'</div></div><div class="flex flex-wrap items-center gap-2"><button onclick="simpanKoreksiDetail(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\',\''+docId+'\')" class="btn-primary shadow-lg"><i class="fas fa-save mr-2"></i>SIMPAN PERUBAHAN</button><button onclick="hapusJawabanSiswa(\''+nisn+'\',\''+mapel+'\',\''+kelas+'\',\''+rombel+'\',\''+docId+'\')" class="btn-danger shadow-lg"><i class="fas fa-trash mr-2"></i>HAPUS</button><button onclick="kembaliKeDaftar()" class="btn-secondary text-muted hover:text-light"><i class="fas fa-arrow-left mr-1"></i>Kembali</button></div></div>';
     
-    h+='<div class="grid grid-cols-3 gap-4 mb-6"><div class="bg-info/10 border border-info/30 rounded-xl p-4 text-center"><div class="text-xs text-info font-bold mb-1"><i class="fas fa-list-ul mr-1"></i>SKOR PG (Maks 30)</div><div id="livePg" class="text-4xl font-black text-info">'+autoSkorPG+'</div><div class="text-[10px] text-info/60 mt-1">'+pgBenar+' benar × 1 poin</div></div><div class="bg-warning/10 border border-warning/30 rounded-xl p-4 text-center"><div class="text-xs text-warning font-bold mb-1"><i class="fas fa-pen mr-1"></i>SKOR URAIAN (Maks 30)</div><div id="liveUr" class="text-4xl font-black text-warning">'+autoSkorUr+'</div></div><div class="bg-kopAccent/10 border-2 border-kopAccent/40 rounded-xl p-4 text-center"><div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL AKHIR</div><div id="liveTotal" class="text-4xl font-black text-kopAccent">'+totalAwal+'</div><div class="text-[10px] text-kopAccent/60 mt-1">((PG + Ur)/60) × 100</div></div></div>';
-    
-    h+='<div class="bg-dark/60 border border-info/20 rounded-xl p-4 mb-6 grid grid-cols-3 gap-4 text-center"><div><div class="text-2xl font-black text-success">'+pgBenar+'</div><div class="text-xs text-success font-bold">BENAR</div></div><div><div class="text-2xl font-black text-danger">'+pgSalah+'</div><div class="text-xs text-danger font-bold">SALAH</div></div><div><div class="text-2xl font-black text-info">'+listPG.length+'</div><div class="text-xs text-info font-bold">TOTAL SOAL PG</div></div></div>';
+    h+='<div class="grid grid-cols-3 gap-4 mb-6"><div class="bg-info/10 border border-info/30 rounded-xl p-4 text-center"><div class="text-xs text-info font-bold mb-1"><i class="fas fa-list-ul mr-1"></i>SKOR PG</div><div id="livePg" class="text-4xl font-black text-info">'+autoSkorPG+'</div><div class="text-[10px] text-info/60 mt-1">Benar: '+pgBenar+' | Salah: '+pgSalah+'</div></div><div class="bg-warning/10 border border-warning/30 rounded-xl p-4 text-center"><div class="text-xs text-warning font-bold mb-1"><i class="fas fa-pen mr-1"></i>SKOR URAIAN</div><div id="liveUr" class="text-4xl font-black text-warning">'+autoSkorUr+'</div></div><div class="bg-kopAccent/10 border-2 border-kopAccent/40 rounded-xl p-4 text-center"><div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-star mr-1"></i>TOTAL AKHIR</div><div id="liveTotal" class="text-4xl font-black text-kopAccent">'+totalAwal+'</div></div></div>';
 
+    // TABEL PG
     if(listPG.length){
-      h+='<div class="mb-8"><div class="flex justify-between items-center mb-3 border-b border-info/30 pb-2"><h4 class="font-bold text-info text-sm"><i class="fas fa-robot mr-2"></i>Jawaban Pilihan Ganda Siswa & Edit Kunci</h4><span class="text-xs bg-info/20 text-info px-2 py-1 rounded font-bold">1 Poin/Soal Benar</span></div><div class="overflow-x-auto"><table class="w-full text-sm border-collapse"><thead><tr class="bg-dark/60 text-xs text-muted"><th class="p-2 border border-border w-10">No</th><th class="p-2 border border-border">Jawaban Siswa</th><th class="p-2 border border-border w-40">Kunci Jawaban <span class="text-kopAccent">(Edit jika salah)</span></th><th class="p-2 border border-border w-20">Status</th></tr></thead><tbody>';
+      h+='<div class="mb-8"><div class="flex justify-between items-center mb-3 border-b border-info/30 pb-2"><h4 class="font-bold text-info text-sm"><i class="fas fa-robot mr-2"></i>Pilihan Ganda</h4></div><div class="space-y-4">';
       listPG.forEach(function(q,i){
         var qId = q._docId;
-        var jawab = jawabanPGMap[qId] || '-'; 
+        var jawab = jawabanPGMap[qId] || ''; 
         var kunciAsli=q.answer||'-';
         var benar=(jawab && jawab!=='-' && jawab.toUpperCase()===kunciAsli.toUpperCase());
-        var opts=getOpts(q.kelas||kelas);
-        h+='<tr class="border-b border-border '+(benar?'bg-success/5':'bg-danger/5')+'"><td class="p-2 border border-border text-center font-bold">'+(i+1)+'</td><td class="p-2 border border-border text-center font-black text-lg '+(benar?'text-success':'text-danger')+'">'+(jawab!=='-'&&jawab!==''?jawab.toUpperCase():'-')+'</td><td class="p-2 border border-border text-center"><select id="kunciPg_'+i+'" data-qid="'+qId+'" class="input-field text-xs py-1 text-center font-bold" onchange="hitungLiveTotal()">';
-        opts.forEach(function(o){h+='<option value="'+o+'" '+(o===kunciAsli.toUpperCase()?'selected':'')+'>'+o+'</option>'});
-        h+='</select></td><td class="p-2 border border-border text-center"><span id="statusPg_'+i+'" class="font-bold text-xs '+(benar?'text-success':'text-danger')+'">'+(benar?'BENAR':'SALAH')+'</span></td></tr>';
+        var opts = q.options || [];
+        var optImages = q.optionImages || [];
+        h+='<div class="bg-dark/40 border border-border/50 rounded-lg p-4 '+(benar?'border-l-4 border-l-success':'border-l-4 border-l-danger')+'">';
+        h+='<div class="mb-3"><span class="text-xs font-bold text-kopAccent mr-2">Soal No. '+(q.no || (i+1))+'</span><p class="text-sm text-light font-medium inline">'+q.text+'</p></div>';
+        if(q.imageUrl) h+='<img src="'+q.imageUrl+'" class="mb-3 rounded border border-border max-h-[120px]" onerror="this.style.display=\'none\'">';
+        h+='<div class="grid md:grid-cols-2 gap-4">';
+        h+='<div class="bg-dark/60 p-3 rounded border '+(benar?'border-success/40':'border-danger/40')+'"><div class="text-xs '+(benar?'text-success':'text-danger')+' font-bold mb-2"><i class="fas fa-user-graduate mr-1"></i>Jawaban Siswa:</div>';
+        h+='<select id="jawabSiswa_PG_'+i+'" data-qid="'+qId+'" class="input-field text-sm py-1 font-bold w-full" onchange="updateStatusWarna('+i+',\''+kunciAsli+'\')">';
+        h+='<option value="">-- Belum dijawab --</option>';
+        opts.forEach(function(o, oi){
+          var huruf = String.fromCharCode(65+oi);
+          var sel = (jawab && huruf===jawab.toUpperCase()) ? 'selected' : '';
+          var potonganTeks = o.length > 40 ? o.substring(0,40)+'...' : o;
+          h+='<option value="'+huruf+'" '+sel+'>'+huruf+'. '+potonganTeks+'</option>';
+        });
+        h+='</select>';
+        if(jawab && jawab !== '-') {
+          var idxJawab = jawab.toUpperCase().charCodeAt(0) - 65;
+          if(opts[idxJawab]) h+='<div class="mt-2 text-sm text-light bg-dark/80 p-2 rounded border border-border min-h-[40px] whitespace-pre-wrap">'+opts[idxJawab]+'</div>';
+          if(optImages[idxJawab]) h+='<img src="'+optImages[idxJawab]+'" class="mt-1 max-h-[60px] rounded" onerror="this.style.display=\'none\'">';
+        }
+        h+='</div>';
+        var idxKunci = kunciAsli.toUpperCase().charCodeAt(0) - 65;
+        h+='<div class="bg-kopAccent/5 p-3 rounded border border-kopAccent/30"><div class="text-xs text-kopAccent font-bold mb-2"><i class="fas fa-key mr-1"></i>Kunci Jawaban:</div>';
+        if(opts[idxKunci]) {
+          h+='<div class="text-sm text-white font-bold bg-kopAccent/10 p-2 rounded border border-kopAccent/40 whitespace-pre-wrap"><span class="text-kopAccent mr-1">'+kunciAsli.toUpperCase()+'. </span>'+opts[idxKunci]+'</div>';
+          if(optImages[idxKunci]) h+='<img src="'+optImages[idxKunci]+'" class="mt-1 max-h-[60px] rounded border border-kopAccent/30" onerror="this.style.display=\'none\'">';
+        } else { h+='<div class="text-sm text-kopAccent font-bold">'+kunciAsli.toUpperCase()+'</div>'; }
+        h+='</div></div></div>';
       });
-      h+='</tbody></table></div></div>';
+      h+='</div></div>';
     }
 
-    h+='<div class="mb-6"><div class="flex justify-between items-center mb-3 border-b border-warning/30 pb-2"><h4 class="font-bold text-warning text-sm"><i class="fas fa-pen-fancy mr-2"></i>Penilaian Uraian</h4><span class="text-xs bg-warning/20 text-warning px-2 py-1 rounded font-bold">Maks 3 Poin/Soal</span></div><div class="space-y-6">';
+    // URAIAN
+    h+='<div class="mb-6"><div class="flex justify-between items-center mb-3 border-b border-warning/30 pb-2"><h4 class="font-bold text-warning text-sm"><i class="fas fa-pen-fancy mr-2"></i>Lembar Jawaban Uraian <span class="text-xs text-light font-normal">(Edit Jawaban & Skor)</span></h4></div><div class="space-y-6">';
     if(listUR.length>0){
       listUR.forEach(function(q,i){
         var qId = q._docId;
-        var skorUr = parseInt(skorUrMap[qId] || 0); 
-        if(skorUr > 3) skorUr = 3;
-        var jawabanUrText = jawabanUrMap[qId] || '(Tidak ada jawaban)'; 
+        var skorUr = parseInt(skorUrMap[qId] || 0); if(skorUr > 3) skorUr = 3;
+        var jawabanUrText = jawabanUrMap[qId] || '';
         var kunciUr=q.answer||'(Tidak ada pedoman)';
-        h+='<div class="bg-dark/40 p-4 rounded-lg border border-warning/20"><div class="flex justify-between items-center mb-3"><span class="bg-warning/20 text-warning px-2 py-0.5 rounded text-xs font-bold">Soal No. '+(listPG.length+i+1)+'</span><div class="flex items-center gap-2"><span class="text-xs text-muted">Maks: 3</span><input type="number" id="inputUr_'+i+'" data-qid="'+qId+'" value="'+skorUr+'" min="0" max="3" oninput="hitungLiveTotal()" style="width:70px;text-align:center;background-color:#1a1a1a;color:#facc15;border:2px solid #facc15;border-radius:8px;padding:6px;font-size:18px;font-weight:900;outline:none"></div></div><p class="text-sm text-light mb-3 font-medium">'+q.text+'</p><div class="grid md:grid-cols-2 gap-4"><div class="bg-dark/60 p-3 rounded border border-border"><div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-key mr-1"></i>Kunci / Pedoman:</div><div class="text-sm text-white font-medium leading-relaxed">'+kunciUr+'</div></div><div class="bg-amber-950/40 p-3 rounded border-2 border-amber-400/40"><div class="text-xs text-amber-300 font-bold mb-2"><i class="fas fa-user-graduate mr-1"></i>Jawaban Siswa:</div><div class="w-full bg-dark/80 text-amber-100 text-sm font-medium leading-relaxed rounded-lg p-3 border border-amber-500/30 min-h-[100px] whitespace-pre-wrap">'+jawabanUrText+'</div></div></div></div>';
+        h+='<div class="bg-dark/40 p-4 rounded-lg border border-warning/20"><div class="flex justify-between items-center mb-3"><span class="bg-warning/20 text-warning px-2 py-0.5 rounded text-xs font-bold">Soal No. '+(q.no || (listPG.length+i+1))+'</span><div class="flex items-center gap-2"><span class="text-xs text-muted">Skor (Max '+bobotUr+'):</span><input type="number" id="skorUr_'+i+'" data-qid="'+qId+'" class="input-field text-center font-black text-warning w-20 text-lg p-1" min="0" max="'+bobotUr+'" value="'+skorUr+'" oninput="updateLiveSkor()"></div></div>';
+        h+='<div class="mb-3"><div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-bullseye mr-1"></i>Fokus Uraian Soal:</div><textarea id="fokusUr_'+i+'" data-qid="'+qId+'" class="input-field text-sm text-white leading-relaxed min-h-[60px]" rows="2">'+q.text+'</textarea></div>';
+        h+='<div class="grid md:grid-cols-2 gap-4"><div class="bg-dark/60 p-3 rounded border border-border"><div class="text-xs text-kopAccent font-bold mb-1"><i class="fas fa-key mr-1"></i>Kunci / Pedoman:</div><div class="text-sm text-white font-medium leading-relaxed">'+kunciUr+'</div></div>';
+        h+='<div class="bg-amber-950/40 p-3 rounded border-2 border-amber-400/40"><div class="text-xs text-amber-300 font-bold mb-2"><i class="fas fa-user-graduate mr-1"></i>Jawaban Siswa:</div><textarea id="jawabUr_'+i+'" data-qid="'+qId+'" class="w-full bg-dark/80 text-amber-100 text-sm font-medium leading-relaxed rounded-lg p-3 border border-amber-500/30 min-h-[100px] focus:outline-none focus:border-amber-300" rows="4">'+jawabanUrText+'</textarea></div></div></div>';
       })
-    } else { h+='<div class="text-center text-muted py-8"><i class="fas fa-file-alt text-3xl mb-2 block"></i><p>Tidak ada soal uraian.</p></div>'; }
-    h+='</div></div></div>'; 
-    h+='<div class="mt-3 p-3 rounded-lg bg-success/5 border border-success/20 text-xs text-success/80"><i class="fas fa-check-circle mr-1"></i>Jika ada kunci jawaban PG yang keliru, silakan edit di kolom "Kunci Jawaban". Nilai akan dihitung ulang otomatis saat disimpan.</div>';
+    } else { h+='<div class="text-center text-muted py-8">Tidak ada soal uraian.</div>'; }
+    h+='</div></div>'; 
     container.innerHTML=h;
   }).catch(function(e){ console.error(e); showToast('Gagal memuat detail: '+e.message,'error'); kembaliKeDaftar(); });
 }
 
+// 5. Update Warna Status Saat Dropdown PG Diubah
+function updateStatusWarna(index, kunci) {
+    var selectEl = document.getElementById('jawabSiswa_PG_'+index);
+    var statusEl = document.getElementById('statusPg_'+index);
+    var trEl = selectEl.closest('tr');
+    if(!selectEl || !statusEl || !trEl) return;
+    var val = selectEl.value.toUpperCase();
+    var k = kunci.toUpperCase();
+    if (val === k && val !== "") {
+        statusEl.textContent = "BENAR";
+        statusEl.className = "font-bold text-xs text-success";
+        trEl.classList.remove('bg-danger/5');
+        trEl.classList.add('bg-success/5');
+    } else {
+        statusEl.textContent = "SALAH";
+        statusEl.className = "font-bold text-xs text-danger";
+        trEl.classList.remove('bg-success/5');
+        trEl.classList.add('bg-danger/5');
+    }
+    updateLiveSkor(); // Juga update total saat PG diubah manual
+}
 
+// 6. Hitung Ulang Live Skor Uraian & Total (Baru)
+function updateLiveSkor() {
+  var bobotUr = 3;
+  var totalUr = 0;
+  var inputs = document.querySelectorAll('input[id^="skorUr_"]');
+  inputs.forEach(function(inp) {
+    var v = parseInt(inp.value || 0);
+    if(v > bobotUr) { v = bobotUr; inp.value = v; }
+    if(v < 0) { v = 0; inp.value = v; }
+    totalUr += v;
+  });
+  if(totalUr > 30) totalUr = 30;
+
+  var elUr = document.getElementById('liveUr');
+  if(elUr) elUr.textContent = totalUr;
+
+  // Ambil juga nilai PG dari live view
+  var elPg = document.getElementById('livePg');
+  var totalPg = elPg ? parseInt(elPg.textContent || 0) : 0;
+  
+  var finalTotal = Math.min(100, Math.round(((totalPg + totalUr) / 60) * 100));
+  var elTotal = document.getElementById('liveTotal');
+  if(elTotal) elTotal.textContent = finalTotal;
+}
+
+// 7. Simpan Perubahan (Diperbaiki: Membaca dari DOM Layar & Hitung Ulang Absolut)
 function simpanKoreksiDetail(nisn, mapel, kelas, rombel, docId) {
-  var db = getDB(kelas); if(!db){ showToast('DB Error','error'); return; }
-  var btn = document.querySelector('#koreksi_mode_container .btn-primary'); var ori = btn.innerHTML;
-  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menghitung & Menyimpan...';
+  var db = getDB(kelas); 
+  if(!db){ showToast('DB Error','error'); return; }
+  var btn = document.querySelector('#koreksi_mode_container .btn-primary'); 
+  if(!btn) return;
+  var ori = btn.innerHTML;
+  btn.disabled = true; 
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
   
   var soalQuery = db.collection('questions');
   if(mapel) soalQuery = soalQuery.where('mapel','==',mapel);
   
   Promise.all([ db.collection('nilai').doc(docId).get(), soalQuery.get() ]).then(function(results) {
     var nilaiDoc = results[0]; var soalSnap = results[1];
-    if (!nilaiDoc.exists) throw new Error('Data siswa hilang'); var nilai = nilaiDoc.data();
-    var soalDocs = []; soalSnap.forEach(function(doc){ var d=doc.data(); d._docId=doc.id; soalDocs.push(d); });
+    if (!nilaiDoc.exists) throw new Error('Data siswa hilang'); 
+    var nilai = nilaiDoc.data();
+    
+    var soalDocs = []; 
+    soalSnap.forEach(function(doc){ var d=doc.data(); d._docId=doc.id; soalDocs.push(d); });
     
     var filteredSoal = soalDocs.filter(function(q){ return q.kelas === kelas; });
-    filteredSoal = sByT(filteredSoal, false);
+    filteredSoal.sort(function(a, b) {
+      var noA = parseInt(a.no) || 0;
+      var noB = parseInt(b.no) || 0;
+      return noA > noB ? 1 : (noA < noB ? -1 : 0);
+    });
     
-    var localPg = [], localUr = []; filteredSoal.forEach(function(q){ if(q.type==='pg') localPg.push(q); else localUr.push(q); });
+    var localPg = [], localUr = []; 
+    filteredSoal.forEach(function(q){ if(q.type==='pg') localPg.push(q); else localUr.push(q); });
+    
     var bobotPG = 1, bobotUr = 3, skorPGTotal = 0, skorUrTotal = 0;
 
-    /* === PERBAIKAN UTAMA: SIMPAN JAWABAN DALAM FORMAT MAP/OBJEK (BUNGKUS ID SOAL) === */
-    var jawabanPGObjFinal = {};  // Menggunakan Object, bukan Array
-    var jawabanUrObjFinal = {};
-    var skorPerSoalUrObjFinal = {};
-    var updateKunciSoal = []; 
+    var dataJawabanPGArr = [];
+    var dataJawabanUrArr = [];
 
-    // 1. Proses PG
+    // PROSES PG: Baca dari Layar (DOM)
     localPg.forEach(function(q, i){
       var qId = q._docId;
+      var kunciAsli = q.answer || ''; 
+      var inputEl = document.getElementById('jawabSiswa_PG_'+i); 
+      var jawab = inputEl ? inputEl.value : '';
       
-      // Ambil jawaban asli siswa dari DB berdasarkan Map lama / Array lama
-      var jawab = '';
-      var rawJawabanPG = nilai.jawabanPG || [];
-      var rawSoalPGIds = nilai.soalPG_Ids || [];
+      dataJawabanPGArr.push({ soalId: qId, noSoal: q.no || (i+1), jawaban: jawab });
       
-      if (typeof rawJawabanPG === 'object' && !Array.isArray(rawJawabanPG)) {
-        jawab = rawJawabanPG[qId] || '';
-      } else if (Array.isArray(rawJawabanPG) && rawSoalPGIds.length > 0) {
-        var idx = rawSoalPGIds.indexOf(qId);
-        if (idx > -1) jawab = rawJawabanPG[idx] || '';
-      } else if (Array.isArray(rawJawabanPG)) {
-        jawab = rawJawabanPG[i] || '';
+      if(jawab && jawab.toUpperCase() === kunciAsli.toUpperCase()) {
+        skorPGTotal += bobotPG;
       }
-      
-      // Masukkan ke Object Map baru
-      jawabanPGObjFinal[qId] = jawab;
-      
-      // Cek koreksi kunci dari guru
-      var kunciInputEl = document.getElementById('kunciPg_'+i); 
-      var kunciBaru = kunciInputEl ? kunciInputEl.value : (q.answer || '');
-      if(qId && kunciBaru !== q.answer) { updateKunciSoal.push({ id: qId, kunciBaru: kunciBaru }); }
-      
-      if(jawab && jawab.toUpperCase() === kunciBaru.toUpperCase()) { skorPGTotal += bobotPG; }
     });
     if(skorPGTotal > 30) skorPGTotal = 30;
 
-    // 2. Proses Uraian
+    // PROSES UR: Baca dari Layar (DOM)
     localUr.forEach(function(q, i){
       var qId = q._docId;
-      var inputEl = document.getElementById('inputUr_'+i); 
-      var s = inputEl ? (parseInt(inputEl.value) || 0) : 0;
-      if(s > bobotUr) s = bobotUr; if(s < 0) s = 0;
+      var skorEl = document.getElementById('skorUr_'+i);
+      var s = skorEl ? parseInt(skorEl.value || 0) : 0;
+      if(isNaN(s)) s = 0;
+      if(s > bobotUr) s = bobotUr; 
+      if(s < 0) s = 0;
+
+      var jawabEl = document.getElementById('jawabUr_'+i);
+      var jawabUr = jawabEl ? jawabEl.value : '';
+
+      dataJawabanUrArr.push({ soalId: qId, noSoal: q.no || (localPg.length+i+1), jawaban: jawabUr, skor: s });
       
-      // Ambil jawaban asli siswa dari DB
-      var jawabUr = '';
-      var rawJawabanUr = nilai.jawabanUr || [];
-      var rawSoalUrIds = nilai.soalUr_Ids || [];
-
-      if (typeof rawJawabanUr === 'object' && !Array.isArray(rawJawabanUr)) {
-        jawabUr = rawJawabanUr[qId] || '';
-      } else if (Array.isArray(rawJawabanUr) && rawSoalUrIds.length > 0) {
-        var idx = rawSoalUrIds.indexOf(qId);
-        if (idx > -1) jawabUr = rawJawabanUr[idx] || '';
-      } else if (Array.isArray(rawJawabanUr)) {
-        jawabUr = rawJawabanUr[i] || '';
-      }
-
-      // Masukkan ke Object Map baru
-      jawabanUrObjFinal[qId] = jawabUr;
-      skorPerSoalUrObjFinal[qId] = s;
       skorUrTotal += s;
     });
     if(skorUrTotal > 30) skorUrTotal = 30;
     
     var finalTotal = Math.min(100, Math.round(((skorPGTotal + skorUrTotal) / 60) * 100));
 
-    // Data yang akan diupdate ke Firestore (Sekarang berupa Object/Map, bukan Array)
     var updateNilaiData = {
-      jawabanPG: jawabanPGObjFinal,         // Format: { "ID_SOAL": "B", "ID_SOAL2": "A" }
-      jawabanUr: jawabanUrObjFinal,         // Format: { "ID_SOAL": "Jawaban uraian..." }
-      skorPerSoalUr: skorPerSoalUrObjFinal, // Format: { "ID_SOAL": 3 }
+      dataJawabanPG: dataJawabanPGArr, 
+      dataJawabanUr: dataJawabanUrArr,
       nilaiPG: skorPGTotal, 
       nilaiUr: skorUrTotal, 
       nilaiTotal: finalTotal, 
-      submittedBy: 'guru_koreksi_fix_v2', 
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      // Hapus soalPG_Ids karena sudah tidak diperlukan lagi (ID sudah jadi key di Object)
-      soalPG_Ids: firebase.firestore.FieldValue.delete(),
-      soalUr_Ids: firebase.firestore.FieldValue.delete()
+      submittedBy: 'guru_edit_jawaban_final', 
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
-    var p1 = db.collection('nilai').doc(docId).update(updateNilaiData);
-    var p2 = Promise.resolve();
-    if(updateKunciSoal.length > 0) { var batch = db.batch(); updateKunciSoal.forEach(function(item) { var soalRef = db.collection('questions').doc(item.id); batch.update(soalRef, { answer: item.kunciBaru }); }); p2 = batch.commit(); }
-    
-    Promise.all([p1, p2]).then(function(){
-      var msg = 'Tersimpan! PG: '+skorPGTotal+' + Ur: '+skorUrTotal+' = Total: '+finalTotal;
-      if(updateKunciSoal.length > 0) msg += ' | '+updateKunciSoal.length+' Kunci Jawaban diperbarui di Bank Soal.';
-      showToast(msg, 'success'); btn.disabled = false; btn.innerHTML = ori; kembaliKeDaftar(); 
+    db.collection('nilai').doc(docId).update(updateNilaiData).then(function(){
+      var msg = 'Berhasil Disimpan! PG: '+skorPGTotal+' | Ur: '+skorUrTotal+' | Total: '+finalTotal;
+      showToast(msg, 'success'); 
+      btn.disabled = false; 
+      btn.innerHTML = ori; 
+      kembaliKeDaftar(); 
     });
-  }).catch(function(e){ showToast('Gagal menyimpan: '+e.message, 'error'); if(btn){ btn.disabled = false; btn.innerHTML = ori; } });
+    
+  }).catch(function(e){ 
+    console.error(e);
+    showToast('Gagal menyimpan: '+e.message, 'error'); 
+    if(btn){ btn.disabled = false; btn.innerHTML = ori; } 
+  });
 }
 /* === CETAK NILAI (FIXED PREDIKAT) === */
 function rCetakNilai(c){var h='<div class="fade-in no-print space-y-4"><div class="card"><h3 class="font-bold text-light mb-4">Cetak Nilai &mdash; <span class="text-kopAccent">'+activeClass+'</span></h3><div class="grid md:grid-cols-4 gap-4 mb-4"><div><label class="text-xs text-muted block mb-1">Mapel</label><select id="cnM" class="input-field" onchange="loadCetakNilai()"><option value="">-- Pilih --</option>';MAPEL_LIST.forEach(function(m){h+='<option value="'+m.id+'">'+m.nama+'</option>'});h+='</select></div><div><label class="text-xs text-muted block mb-1">Kelas</label><select id="cnK" class="input-field" onchange="switchDB(this.value); loadCetakNilai()"><option value="">Semua</option>';getGuruKelas().forEach(function(k){h+='<option value="'+k+'"'+(k===activeClass?' selected':'')+'>'+k+'</option>'});h+='</select></div><div><label class="text-xs text-muted block mb-1">Rombel</label><select id="cnR" class="input-field" onchange="loadCetakNilai()"><option value="">Semua</option>';getGuruRombel().forEach(function(r){h+='<option value="'+r+'">Rombel '+r+'</option>'});h+='</select></div><div class="flex items-end gap-2"><button onclick="loadCetakNilai()" class="btn-primary text-sm flex-1"><i class="fas fa-search mr-2"></i>Tampilkan</button><button onclick="doCetakNilai()" class="btn-secondary text-sm"><i class="fas fa-print mr-2"></i>Cetak</button></div></div></div><div id="cnBox"></div></div>';c.innerHTML=h}
